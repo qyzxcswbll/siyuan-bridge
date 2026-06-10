@@ -164,28 +164,49 @@ async def test_sy_save_without_name_saves_to_inbox():
 # ── notebook 必填测试 ──────────────────────
 
 @pytest.mark.asyncio
-async def test_sy_save_without_notebook_prompts():
+async def test_sy_save_without_notebook_lists_notebooks():
     import siyuan_mcp.server as srv
+    from unittest.mock import patch
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.create_doc.side_effect = ValueError("no_notebook")
     try:
-        result = await _handle_sy_save({"content": "# 测试"})
-        assert "sy-notebooks" in result[0].text
+        with patch("httpx.AsyncClient") as mock_http:
+            # 模拟笔记本列表 API 返回
+            mock_http_instance = AsyncMock()
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json = lambda: {"code": 0, "msg": "", "data": {"notebooks": [{"id": "1", "name": "Test"}]}}
+            mock_http_instance.post.return_value = mock_response
+
+            result = await _handle_sy_save({"content": "# 测试"})
+            assert len(result) == 1
+            assert "Test" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
 
 
 @pytest.mark.asyncio
-async def test_sy_auto_without_notebook_prompts():
+async def test_sy_auto_without_notebook_lists_notebooks():
     import siyuan_mcp.server as srv
     from siyuan_mcp.config.loader import Config
+    from unittest.mock import patch
     srv._config = Config()
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.create_doc.side_effect = ValueError("no_notebook")
     try:
-        result = await _handle_sy_auto({"content": "# 测试"})
-        assert "sy-notebooks" in result[0].text
+        with patch("httpx.AsyncClient") as mock_http:
+            mock_http_instance = AsyncMock()
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json = lambda: {"code": 0, "msg": "", "data": {"notebooks": [{"id": "1", "name": "Test"}]}}
+            mock_http_instance.post.return_value = mock_response
+
+            result = await _handle_sy_auto({"content": "# 测试"})
+            assert len(result) == 1
+            assert "Test" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
