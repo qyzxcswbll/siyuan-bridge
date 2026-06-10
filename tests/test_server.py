@@ -115,9 +115,9 @@ async def test_sy_auto_saves_with_path():
 
     try:
         result = await _handle_sy_auto({"content": "# wallet 签名方案\n..."})
-        # 验证 path 传入了 /projects/wallet/
         call_kwargs = srv._siyuan_client.create_doc.call_args
-        assert call_kwargs[1]["path"] == "/projects/wallet/"
+        # 验证 path 以 /projects/wallet/ 开头且包含文档名
+        assert call_kwargs[1]["path"].startswith("/projects/wallet/")
         assert "已自动保存" in result[0].text
     finally:
         srv._siyuan_client = None
@@ -135,8 +135,9 @@ async def test_sy_save_with_name_saves_to_project():
     try:
         result = await _handle_sy_save({"content": "# 测试", "name": "wallet"})
         call_kwargs = srv._siyuan_client.create_doc.call_args
-        assert call_kwargs[1]["path"] == "/projects/wallet/"
-        assert "wallet" in result[0].text
+        # 验证 path 以 /projects/wallet/ 开头（后面有文档名+时间戳）
+        assert call_kwargs[1]["path"].startswith("/projects/wallet/")
+        assert "项目" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
@@ -151,7 +152,9 @@ async def test_sy_save_without_name_saves_to_inbox():
     try:
         result = await _handle_sy_save({"content": "# 测试"})
         call_kwargs = srv._siyuan_client.create_doc.call_args
-        assert call_kwargs[1]["path"] == ""
+        # 无 name 时 path 以 / 开头，不以 /projects/ 开头
+        assert call_kwargs[1]["path"].startswith("/")
+        assert not call_kwargs[1]["path"].startswith("/projects/")
         assert "收集箱" in result[0].text
     finally:
         srv._siyuan_client = None

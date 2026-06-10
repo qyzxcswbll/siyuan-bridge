@@ -6,14 +6,13 @@ from pydantic import BaseModel
 
 
 class CreateDocRequest(BaseModel):
-    """创建文档的请求参数。API 使用 notebook 而非 notebookId。"""
+    """创建文档的请求参数。path 必须唯一，否则思源复用已有文档。"""
     markdown: str
     notebook_id: str = ""
     path: str = ""
 
     def model_dump(self, **kwargs) -> dict:
         d = super().model_dump(**kwargs)
-        # API 字段名是 notebook
         d["notebook"] = d.pop("notebook_id")
         return d
 

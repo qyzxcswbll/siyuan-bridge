@@ -1,7 +1,9 @@
 """MCP 服务主文件。声明所有工具，启动服务。"""
 
 import os
+import re
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +18,28 @@ from siyuan_mcp.codebase.search import CodebaseSearcher
 
 
 # ── 工具函数 ──────────────────────────────────────
+
+def _sanitize_filename(s: str) -> str:
+    """清理字符串为安全的文件名部分。"""
+    s = re.sub(r'[\\/:*?"<>|#]', '', s)
+    s = s.strip()
+    return s[:50] if len(s) > 50 else s
+
+
+def _make_doc_path(markdown: str, name: str = "") -> str:
+    """根据 markdown 内容和项目名生成唯一文档路径。
+
+    path 必须唯一，否则思源会复用已有文档。
+    """
+    title = _extract_title(markdown)
+    safe_title = _sanitize_filename(title) if title != "未命名笔记" else "笔记"
+    ts = str(int(time.time() * 1000))
+    filename = f"{safe_title}-{ts}"
+
+    if name:
+        return f"/projects/{name}/{filename}"
+    return f"/{filename}"
+
 
 def _format_doc_result(result, action: str, location: str = "") -> str:
     """格式化保存结果消息，兼容 ID 为空的情况。"""
@@ -201,18 +225,15 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
     try:
-        title = args.get("source", "Claude 笔记")
         tags = args.get("tags")
         name = args.get("name", "")
 
         if tags:
             content += "\n\n---\n标签：" + "、".join(tags)
 
-        # name 有值时保存到项目目录
-        path = f"/projects/{name}/" if name else ""
+        path = _make_doc_path(content, name=name)
         result = await _siyuan_client.create_doc(
             markdown=content,
-            title=title,
             path=path,
         )
 
@@ -322,11 +343,10 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
         if not name:
             name = "uncategorized"
 
-        path = f"/projects/{name}/"
+        path = _make_doc_path(content, name=name)
         title = _extract_title(content)
         result = await _siyuan_client.create_doc(
             markdown=content,
-            title=title,
             path=path,
         )
         link = f"\n- 链接：siyuan://blocks/{result.id}" if result.id else ""
@@ -336,7 +356,7 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
                 text=(
                     f"✅ 已自动保存（来源：{source}）\n"
                     f"- 项目：{name}\n"
-                    f"- 标题：{result.title}"
+                    f"- 标题：{title}"
                     f"{link}"
                 ),
             )
