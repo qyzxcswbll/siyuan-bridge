@@ -141,24 +141,6 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
-            name="sy-today",
-            description="保存内容到今日日记。将 Markdown 内容追加到思源笔记当天的日记文档中。",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "要追加到日记的内容（Markdown 格式）",
-                    },
-                    "notebook": {
-                        "type": "string",
-                        "description": "可选，笔记本 ID。不指定则用默认笔记本",
-                    },
-                },
-                "required": ["content"],
-            },
-        ),
-        types.Tool(
             name="sy-find",
             description="搜索思源笔记知识库。支持普通关键词搜索和 AI 语义搜索两种模式。",
             inputSchema={
@@ -226,7 +208,6 @@ async def handle_call_tool(
     handlers = {
         "sy-notebooks": _handle_sy_notebooks,
         "sy-save": _handle_sy_save,
-        "sy-today": _handle_sy_today,
         "sy-auto": _handle_sy_auto,
         "sy-find": _handle_sy_find,
         "code-find": _handle_code_find,
@@ -311,37 +292,6 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
 
 
-# ── sy-today ─────────────────────────────────────
-
-async def _handle_sy_today(args: dict) -> list[types.TextContent]:
-    content = args.get("content", "")
-    if not content.strip():
-        return [types.TextContent(type="text", text="❌ 内容不能为空")]
-
-    try:
-        notebook = args.get("notebook", "")
-        doc_id = await _siyuan_client.get_or_create_daily_note(notebook_id=notebook)
-        if not doc_id:
-            return [types.TextContent(
-                type="text", text="❌ 无法创建今日日记，请检查思源设置"
-            )]
-
-        await _siyuan_client.append_block(doc_id, content)
-        return [types.TextContent(
-            type="text",
-            text=f"✅ 已追加到今日日记\n- 文档 ID：`{doc_id}`\n- 链接：siyuan://blocks/{doc_id}",
-        )]
-    except ConnectionError as e:
-        return [types.TextContent(type="text", text=f"❌ {e}")]
-    except ValueError as e:
-        if str(e) == "no_notebook":
-            return [types.TextContent(
-                type="text",
-                text="⚠️ 请先调用 `sy-notebooks` 选择笔记本，然后用 `notebook` 参数指定笔记本 ID",
-            )]
-        return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
 
 
 # ── sy-auto ─────────────────────────────────────
