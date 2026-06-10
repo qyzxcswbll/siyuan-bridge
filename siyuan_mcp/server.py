@@ -37,7 +37,34 @@ async def handle_list_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name="sy-save",
-            description="快速保存笔记到思源收集箱。将内容以 Markdown 格式保存到思源笔记的默认笔记本。",
+            description="保存笔记到思源。name 为空时保存到收集箱，name 有值时保存到对应项目目录。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "笔记内容（Markdown 格式）",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "可选，项目名称，有值时保存到 /projects/{name}/ 目录",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "可选，标签列表",
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "可选，来源标记（如 claude-chat）",
+                    },
+                },
+                "required": ["content"],
+            },
+        ),
+        types.Tool(
+            name="sy-auto",
+            description="自动分类保存笔记。根据项目名称（匹配 codebase.repos）和内容标题自动归类到思源项目目录。",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -49,10 +76,6 @@ async def handle_list_tools() -> list[types.Tool]:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "可选，标签列表",
-                    },
-                    "source": {
-                        "type": "string",
-                        "description": "可选，来源标记（如 claude-chat）",
                     },
                 },
                 "required": ["content"],
@@ -140,6 +163,7 @@ async def handle_call_tool(
     handlers = {
         "sy-save": _handle_sy_save,
         "sy-today": _handle_sy_today,
+        "sy-auto": _handle_sy_auto,
         "sy-find": _handle_sy_find,
         "code-find": _handle_code_find,
     }
@@ -161,20 +185,25 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
     try:
         title = args.get("source", "Claude 笔记")
         tags = args.get("tags")
+        name = args.get("name", "")
 
-        # 如果有标签，在内容末尾追加
         if tags:
             content += "\n\n---\n标签：" + "、".join(tags)
 
+        # name 有值时保存到项目目录
+        path = f"/projects/{name}/" if name else ""
         result = await _siyuan_client.create_doc(
             markdown=content,
             title=title,
+            path=path,
         )
+
+        location = f"项目 [{name}]" if name else "收集箱"
         return [
             types.TextContent(
                 type="text",
                 text=(
-                    f"✅ 已保存到思源\n"
+                    f"✅ 已保存到思源（{location}）\n"
                     f"- 文档 ID：`{result.id}`\n"
                     f"- 标题：{result.title}\n"
                     f"- 链接：siyuan://blocks/{result.id}"
@@ -210,6 +239,72 @@ async def _handle_sy_today(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
+
+
+# ── sy-auto ─────────────────────────────────────
+
+def _extract_title(markdown: str) -> str:
+    """从 Markdown 内容中提取第一个标题。"""
+    for line in markdown.strip().split("\n"):
+        line = line.strip()
+        if line.startswith("# "):
+            return line[2:].strip()
+        if line.startswith("## "):
+            return line[3:].strip()
+    return "未命名笔记"
+
+
+def _match_project(content: str) -> str:
+    """尝试从 content 和 codebase repos 中匹配项目名称。"""
+    repos = _config.codebase.repos
+    if not repos:
+        return ""
+    # 从内容中检查是否提到某个项目名
+    title = _extract_title(content).lower()
+    for repo in repos:
+        if repo.name.lower() in title or repo.name.lower() in content.lower():
+            return repo.name
+    return ""
+
+
+async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
+    content = args.get("content", "")
+    if not content.strip():
+        return [types.TextContent(type="text", text="❌ 内容不能为空")]
+
+    try:
+        tags = args.get("tags")
+        if tags:
+            content += "\n\n---\n标签：" + "、".join(tags)
+
+        # 自动匹配项目
+        name = _match_project(content)
+        if not name:
+            # 无匹配时也保存，放到统一目录
+            name = "uncategorized"
+
+        path = f"/projects/{name}/"
+        title = _extract_title(content)
+        result = await _siyuan_client.create_doc(
+            markdown=content,
+            title=title,
+            path=path,
+        )
+        return [
+            types.TextContent(
+                type="text",
+                text=(
+                    f"✅ 已自动保存到项目 [{name}]\n"
+                    f"- 文档 ID：`{result.id}`\n"
+                    f"- 标题：{result.title}\n"
+                    f"- 链接：siyuan://blocks/{result.id}"
+                ),
+            )
+        ]
+    except ConnectionError as e:
+        return [types.TextContent(type="text", text=f"❌ {e}")]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"❌ 自动保存失败：{e}")]
 
 
 # ── sy-find ──────────────────────────────────────

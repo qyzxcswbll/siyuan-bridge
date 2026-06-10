@@ -10,6 +10,7 @@ class CreateDocRequest(BaseModel):
     markdown: str
     notebook_id: str = ""
     title: str = ""
+    path: str = ""
 
 
 class CreateDocResponse(BaseModel):

@@ -30,12 +30,14 @@ class SiyuanClient:
         markdown: str,
         notebook_id: str = "",
         title: str = "",
+        path: str = "",
     ) -> CreateDocResponse:
-        """在思源中创建文档。"""
+        """在思源中创建文档。path 指定目录路径，如 /projects/wallet/。"""
         data = CreateDocRequest(
             markdown=markdown,
             notebook_id=notebook_id,
             title=title,
+            path=path,
         ).model_dump()
         resp = await self._call_api("/api/filetree/createDocWithMd", data)
         return CreateDocResponse(
