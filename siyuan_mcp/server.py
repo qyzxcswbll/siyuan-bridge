@@ -78,6 +78,15 @@ def _ensure_initialized():
 async def handle_list_tools() -> list[types.Tool]:
     return [
         types.Tool(
+            name="sy-notebooks",
+            description="列出思源笔记中所有可用的笔记本。保存笔记前先调用此工具让用户选择保存位置。",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        types.Tool(
             name="sy-save",
             description="保存笔记到思源。name 为空时保存到收集箱，name 有值时保存到对应项目目录。",
             inputSchema={
@@ -86,6 +95,10 @@ async def handle_list_tools() -> list[types.Tool]:
                     "content": {
                         "type": "string",
                         "description": "笔记内容（Markdown 格式）",
+                    },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，笔记本 ID（调用 sy-notebooks 获取）。不指定则用默认笔记本",
                     },
                     "name": {
                         "type": "string",
@@ -114,6 +127,10 @@ async def handle_list_tools() -> list[types.Tool]:
                         "type": "string",
                         "description": "笔记内容（Markdown 格式）",
                     },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，笔记本 ID。不指定则用默认笔记本",
+                    },
                     "tags": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -132,6 +149,10 @@ async def handle_list_tools() -> list[types.Tool]:
                     "content": {
                         "type": "string",
                         "description": "要追加到日记的内容（Markdown 格式）",
+                    },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，笔记本 ID。不指定则用默认笔记本",
                     },
                 },
                 "required": ["content"],
@@ -203,6 +224,7 @@ async def handle_call_tool(
     _ensure_initialized()
 
     handlers = {
+        "sy-notebooks": _handle_sy_notebooks,
         "sy-save": _handle_sy_save,
         "sy-today": _handle_sy_today,
         "sy-auto": _handle_sy_auto,
@@ -217,6 +239,37 @@ async def handle_call_tool(
     return await handler(arguments or {})
 
 
+# ── sy-notebooks ─────────────────────────────────
+
+async def _handle_sy_notebooks(args: dict) -> list[types.TextContent]:
+    """列出所有笔记本。"""
+    _ensure_initialized()
+    try:
+        import httpx
+        siyuan_cfg = _config.siyuan
+        headers = {"Content-Type": "application/json"}
+        if siyuan_cfg.token:
+            headers["Authorization"] = f"Token {siyuan_cfg.token}"
+        async with httpx.AsyncClient(
+            base_url=f"http://{siyuan_cfg.host}:{siyuan_cfg.port}",
+            headers=headers,
+            timeout=15.0,
+        ) as c:
+            r = await c.post("/api/notebook/lsNotebooks", json={})
+            body = r.json()
+            if body.get("code") != 0:
+                return [types.TextContent(type="text", text=f"获取笔记本列表失败：{body.get('msg')}")]
+            notebooks = body["data"]["notebooks"]
+            lines = ["📚 可用的笔记本：\n"]
+            for nb in notebooks:
+                lines.append(f"- `{nb['id']}` — **{nb['name']}**")
+                if nb.get("closed"):
+                    lines[-1] += " 🔒"
+            return [types.TextContent(type="text", text="\n".join(lines))]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"获取笔记本列表失败：{e}")]
+
+
 # ── sy-save ──────────────────────────────────────
 
 async def _handle_sy_save(args: dict) -> list[types.TextContent]:
@@ -227,23 +280,27 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
     try:
         tags = args.get("tags")
         name = args.get("name", "")
+        notebook = args.get("notebook", "")
 
         if tags:
             content += "\n\n---\n标签：" + "、".join(tags)
 
         path = _make_doc_path(content, name=name)
+        title = _extract_title(content)
         result = await _siyuan_client.create_doc(
             markdown=content,
             path=path,
+            notebook_id=notebook,
         )
 
         location = f"项目 [{name}]" if name else "收集箱"
-        return [
-            types.TextContent(
-                type="text",
-                text=_format_doc_result(result, "保存", location),
-            )
-        ]
+        result_text = (
+            f"✅ 已保存到思源（{location}）\n"
+            f"- 标题：{title}\n"
+        )
+        if result.id:
+            result_text += f"- 链接：siyuan://blocks/{result.id}"
+        return [types.TextContent(type="text", text=result_text)]
     except ConnectionError as e:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except Exception as e:
@@ -258,7 +315,8 @@ async def _handle_sy_today(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
     try:
-        doc_id = await _siyuan_client.get_or_create_daily_note()
+        notebook = args.get("notebook", "")
+        doc_id = await _siyuan_client.get_or_create_daily_note(notebook_id=notebook)
         if not doc_id:
             return [types.TextContent(
                 type="text", text="❌ 无法创建今日日记，请检查思源设置"
@@ -336,6 +394,7 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
             return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
         tags = args.get("tags")
+        notebook = args.get("notebook", "")
         if tags:
             content += "\n\n---\n标签：" + "、".join(tags)
 
@@ -348,6 +407,7 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
         result = await _siyuan_client.create_doc(
             markdown=content,
             path=path,
+            notebook_id=notebook,
         )
         link = f"\n- 链接：siyuan://blocks/{result.id}" if result.id else ""
         return [
