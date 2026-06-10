@@ -25,6 +25,14 @@ class SiyuanClient:
 
         self._client = httpx.AsyncClient(base_url=base_url, headers=headers, timeout=15.0)
 
+    async def _get_default_notebook(self) -> str:
+        """获取第一个可用的笔记本 ID。"""
+        resp = await self._call_api("/api/notebook/lsNotebooks", {})
+        notebooks = resp.get("notebooks", []) if resp else []
+        if notebooks:
+            return notebooks[0]["id"]
+        return ""
+
     async def create_doc(
         self,
         markdown: str,
@@ -32,7 +40,10 @@ class SiyuanClient:
         title: str = "",
         path: str = "",
     ) -> CreateDocResponse:
-        """在思源中创建文档。path 指定目录路径，如 /projects/wallet/。"""
+        """在思源中创建文档。notebook_id 为空时自动选第一个笔记本。"""
+        if not notebook_id:
+            notebook_id = await self._get_default_notebook()
+
         data = CreateDocRequest(
             markdown=markdown,
             notebook_id=notebook_id,
@@ -40,13 +51,9 @@ class SiyuanClient:
             path=path,
         ).model_dump()
         resp = await self._call_api("/api/filetree/createDocWithMd", data)
-        # 思源 v3.6.5 创建成功后不返回 data，但文档已创建
-        # 尝试先按有 ID 的情况取，没有则用路径代替
-        doc_id = resp.get("id") if resp else ""
-        return CreateDocResponse(
-            id=doc_id or "",
-            title=resp.get("title") if resp and "title" in resp else (title or "未命名"),
-        )
+        # API 返回 data 为文档 ID 字符串，或 null
+        doc_id = resp if isinstance(resp, str) else (resp.get("id", "") if resp else "")
+        return CreateDocResponse(id=doc_id or "", title=title or "未命名")
 
     async def search_notes(
         self,
@@ -60,7 +67,6 @@ class SiyuanClient:
         if notebook:
             payload["notebook"] = notebook
 
-        # 思源 API 路径因模式不同
         api_path = (
             "/api/search/searchFullText" if mode == "ai"
             else "/api/search/searchNotes"
@@ -68,14 +74,10 @@ class SiyuanClient:
 
         resp = await self._call_api(api_path, payload)
         raw_results = resp if isinstance(resp, list) else resp.get("results", [])
-
         return [SearchNotesResult(**item) for item in raw_results]
 
     async def get_or_create_daily_note(self, notebook_id: str = "") -> str:
-        """获取或创建今日日记，返回文档 ID。
-
-        调用思源 createDailyNote API。
-        """
+        """获取或创建今日日记，返回文档 ID。"""
         payload: dict[str, Any] = {}
         if notebook_id:
             payload["notebookId"] = notebook_id
@@ -83,10 +85,7 @@ class SiyuanClient:
         return resp.get("id", "")
 
     async def append_block(self, parent_id: str, content: str) -> list[dict]:
-        """向指定块追加内容。
-
-        使用思源 appendBlock API 在文档末尾追加 Markdown 块。
-        """
+        """向指定块追加内容。"""
         data = AppendBlockRequest(
             parent_id=parent_id,
             data=content,
@@ -98,9 +97,7 @@ class SiyuanClient:
         try:
             response = await self._client.post(path, json=data)
         except (httpx.ConnectError, httpx.TimeoutException) as e:
-            raise ConnectionError(
-                "思源笔记未运行，请先启动思源笔记"
-            ) from e
+            raise ConnectionError("思源笔记未运行，请先启动思源笔记") from e
 
         if response.status_code != 200:
             raise ConnectionError(
@@ -109,9 +106,7 @@ class SiyuanClient:
 
         body = response.json()
         if body.get("code") != 0:
-            raise ValueError(
-                f"思源 API 错误：{body.get('msg', '未知错误')}"
-            )
+            raise ValueError(f"思源 API 错误：{body.get('msg', '未知错误')}")
 
         return body.get("data") or {}  # data 可能为 null，回退为空字典
 
