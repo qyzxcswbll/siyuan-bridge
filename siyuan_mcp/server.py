@@ -1,6 +1,8 @@
 """MCP 服务主文件。声明所有工具，启动服务。"""
 
+import os
 import sys
+from pathlib import Path
 from typing import Optional
 
 import mcp.server.stdio
@@ -267,20 +269,46 @@ def _match_project(content: str) -> str:
     return ""
 
 
+def _resolve_content(raw: str) -> tuple[str, str]:
+    """解析 content 参数。如果是文件路径则读取文件，返回 (内容, 来源说明)。"""
+    text = raw.strip()
+
+    # 去掉 @ 前缀
+    if text.startswith("@"):
+        text = text[1:].strip()
+
+    # 检查是否是有效文件路径
+    if text:
+        p = Path(text)
+        if not p.is_absolute():
+            p = Path.cwd() / text
+        if p.exists() and p.is_file():
+            try:
+                content = p.read_text(encoding="utf-8")
+                return content, f"文件 `{p.name}`"
+            except Exception as e:
+                return raw, f"（读取文件失败：{e}，按原文保存）"
+
+    # 不是路径，原样返回
+    return raw, "笔记"
+
+
 async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
-    content = args.get("content", "")
-    if not content.strip():
+    content_raw = args.get("content", "")
+    if not content_raw.strip():
         return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
     try:
+        content, source = _resolve_content(content_raw)
+        if not content.strip():
+            return [types.TextContent(type="text", text="❌ 内容不能为空")]
+
         tags = args.get("tags")
         if tags:
             content += "\n\n---\n标签：" + "、".join(tags)
 
-        # 自动匹配项目
         name = _match_project(content)
         if not name:
-            # 无匹配时也保存，放到统一目录
             name = "uncategorized"
 
         path = f"/projects/{name}/"
@@ -294,7 +322,8 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
             types.TextContent(
                 type="text",
                 text=(
-                    f"✅ 已自动保存到项目 [{name}]\n"
+                    f"✅ 已自动保存（来源：{source}）\n"
+                    f"- 项目：{name}\n"
                     f"- 文档 ID：`{result.id}`\n"
                     f"- 标题：{result.title}\n"
                     f"- 链接：siyuan://blocks/{result.id}"
