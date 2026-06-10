@@ -31,11 +31,12 @@
 ### 安装
 
 ```bash
-# 克隆仓库
+# 方式一：从 PyPI 安装（推荐）
+pip install siyuan-mcp
+
+# 方式二：从源码安装
 git clone https://github.com/your/siyuan-mcp.git
 cd siyuan-mcp
-
-# 安装依赖（推荐使用 uv）
 pip install -e .
 ```
 
@@ -49,34 +50,33 @@ cp config.yaml.example config.yaml
 
 ### 注册到 Claude Code
 
-在 `claude.json`（或 VS Code 的 `cline_mcp_settings.json`）中添加：
+在 `claude.json` 中添加：
 
 ```json
 {
   "mcpServers": {
     "siyuan-mcp": {
       "command": "python",
-      "args": ["-m", "siyuan_mcp"],
-      "cwd": "D:/Code/siyuan-bridge"
+      "args": ["-m", "siyuan_mcp"]
     }
   }
 }
 ```
 
-或者使用 `uv`（推荐）：
+或者通过 PyPI 安装后使用 `uvx`（推荐）：
 
 ```json
 {
   "mcpServers": {
     "siyuan-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "D:/Code/siyuan-bridge", "python", "-m", "siyuan_mcp"]
+      "command": "uvx",
+      "args": ["siyuan-mcp"]
     }
   }
 }
 ```
 
-> **注意**：请将 `D:/Code/siyuan-bridge` 替换为你的实际项目路径。
+> **注意**：使用 `pip install siyuan-mcp` 后，`uvx siyuan-mcp` 会自动运行已安装的包。
 
 ## 使用示例
 
