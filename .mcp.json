@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "siyuan-mcp": {
+      "command": "python",
+      "args": ["-m", "siyuan_mcp"],
+      "env": {
+        "SIYUAN_HOST": "127.0.0.1",
+        "SIYUAN_PORT": "6806"
+      }
+    }
+  }
+}
