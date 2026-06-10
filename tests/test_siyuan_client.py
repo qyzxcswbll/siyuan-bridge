@@ -58,27 +58,22 @@ def config():
 @pytest.mark.asyncio
 async def test_save_note_success(config):
     client = SiyuanClient(config)
-    # 模拟 notebook 列表返回
-    nb_response = {"code": 0, "msg": "", "data": {"notebooks": [{"id": "nb-1", "name": "Test"}]}}
-    # 创建文档返回 doc ID 字符串
     doc_response = {"code": 0, "msg": "", "data": "20260610123456-abc123"}
-
-    call_count = 0
-    def resp_side_effect():
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            return nb_response
-        return doc_response
 
     with patch.object(client._client, "post") as mock_post:
         mock_post.return_value = AsyncMock()
         mock_post.return_value.status_code = 200
-        mock_post.return_value.json = resp_side_effect
+        mock_post.return_value.json = lambda: doc_response
 
-        result = await client.create_doc("# 测试笔记", title="测试笔记")
+        result = await client.create_doc("# 测试笔记", title="测试笔记", notebook_id="nb-1")
         assert result.id == "20260610123456-abc123"
         assert result.title == "测试笔记"
+
+@pytest.mark.asyncio
+async def test_create_doc_without_notebook_raises(config):
+    client = SiyuanClient(config)
+    with pytest.raises(ValueError, match="no_notebook"):
+        await client.create_doc("# 测试")
 
 
 @pytest.mark.asyncio
@@ -119,7 +114,7 @@ async def test_connection_error_returns_friendly_message(config):
         mock_post.side_effect = ConnectError("连接被拒绝")
 
         with pytest.raises(ConnectionError, match="思源笔记未运行"):
-            await client.create_doc("# test")
+            await client.create_doc("# test", notebook_id="nb-1")
 
 
 @pytest.mark.asyncio
@@ -133,7 +128,7 @@ async def test_api_error_response(config):
         mock_post.return_value.json = lambda: mock_response
 
         with pytest.raises(ValueError, match="Token 无效"):
-            await client.create_doc("# test")
+            await client.create_doc("# test", notebook_id="nb-1")
 
 
 # ── 日记功能测试 ─────────────────────────────
@@ -152,7 +147,7 @@ async def test_get_or_create_daily_note_success(config):
         mock_post.return_value.status_code = 200
         mock_post.return_value.json = lambda: mock_response
 
-        doc_id = await client.get_or_create_daily_note()
+        doc_id = await client.get_or_create_daily_note(notebook_id="nb-1")
         assert doc_id == "daily-note-123"
 
 

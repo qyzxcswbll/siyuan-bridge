@@ -303,6 +303,13 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=result_text)]
     except ConnectionError as e:
         return [types.TextContent(type="text", text=f"❌ {e}")]
+    except ValueError as e:
+        if str(e) == "no_notebook":
+            return [types.TextContent(
+                type="text",
+                text="⚠️ 请先调用 `sy-notebooks` 选择笔记本，然后用 `notebook` 参数指定笔记本 ID",
+            )]
+        return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
 
@@ -329,6 +336,13 @@ async def _handle_sy_today(args: dict) -> list[types.TextContent]:
         )]
     except ConnectionError as e:
         return [types.TextContent(type="text", text=f"❌ {e}")]
+    except ValueError as e:
+        if str(e) == "no_notebook":
+            return [types.TextContent(
+                type="text",
+                text="⚠️ 请先调用 `sy-notebooks` 选择笔记本，然后用 `notebook` 参数指定笔记本 ID",
+            )]
+        return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
 
@@ -423,6 +437,13 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
         ]
     except ConnectionError as e:
         return [types.TextContent(type="text", text=f"❌ {e}")]
+    except ValueError as e:
+        if str(e) == "no_notebook":
+            return [types.TextContent(
+                type="text",
+                text="⚠️ 请先调用 `sy-notebooks` 选择笔记本，然后用 `notebook` 参数指定笔记本 ID",
+            )]
+        return [types.TextContent(type="text", text=f"❌ 自动保存失败：{e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 自动保存失败：{e}")]
 

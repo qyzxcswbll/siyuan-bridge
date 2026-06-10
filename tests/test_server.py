@@ -114,7 +114,7 @@ async def test_sy_auto_saves_with_path():
     srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "签名方案"})()
 
     try:
-        result = await _handle_sy_auto({"content": "# wallet 签名方案\n..."})
+        result = await _handle_sy_auto({"content": "# wallet 签名方案\n...", "notebook": "nb-1"})
         call_kwargs = srv._siyuan_client.create_doc.call_args
         # 验证 path 以 /projects/wallet/ 开头且包含文档名
         assert call_kwargs[1]["path"].startswith("/projects/wallet/")
@@ -133,7 +133,7 @@ async def test_sy_save_with_name_saves_to_project():
     srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试"})()
 
     try:
-        result = await _handle_sy_save({"content": "# 测试", "name": "wallet"})
+        result = await _handle_sy_save({"content": "# 测试", "name": "wallet", "notebook": "nb-1"})
         call_kwargs = srv._siyuan_client.create_doc.call_args
         # 验证 path 以 /projects/wallet/ 开头（后面有文档名+时间戳）
         assert call_kwargs[1]["path"].startswith("/projects/wallet/")
@@ -150,12 +150,42 @@ async def test_sy_save_without_name_saves_to_inbox():
     srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试"})()
 
     try:
-        result = await _handle_sy_save({"content": "# 测试"})
+        result = await _handle_sy_save({"content": "# 测试", "notebook": "nb-1"})
         call_kwargs = srv._siyuan_client.create_doc.call_args
         # 无 name 时 path 以 / 开头，不以 /projects/ 开头
         assert call_kwargs[1]["path"].startswith("/")
         assert not call_kwargs[1]["path"].startswith("/projects/")
         assert "收集箱" in result[0].text
+    finally:
+        srv._siyuan_client = None
+        srv._config = None
+
+
+# ── notebook 必填测试 ──────────────────────
+
+@pytest.mark.asyncio
+async def test_sy_save_without_notebook_prompts():
+    import siyuan_mcp.server as srv
+    srv._siyuan_client = AsyncMock()
+    srv._siyuan_client.create_doc.side_effect = ValueError("no_notebook")
+    try:
+        result = await _handle_sy_save({"content": "# 测试"})
+        assert "sy-notebooks" in result[0].text
+    finally:
+        srv._siyuan_client = None
+        srv._config = None
+
+
+@pytest.mark.asyncio
+async def test_sy_auto_without_notebook_prompts():
+    import siyuan_mcp.server as srv
+    from siyuan_mcp.config.loader import Config
+    srv._config = Config()
+    srv._siyuan_client = AsyncMock()
+    srv._siyuan_client.create_doc.side_effect = ValueError("no_notebook")
+    try:
+        result = await _handle_sy_auto({"content": "# 测试"})
+        assert "sy-notebooks" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
@@ -170,7 +200,7 @@ async def test_sy_save_handles_connection_error():
     srv._siyuan_client.create_doc.side_effect = ConnectionError("思源笔记未运行")
 
     try:
-        result = await _handle_sy_save({"content": "# 测试"})
+        result = await _handle_sy_save({"content": "# 测试", "notebook": "nb-1"})
         assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None

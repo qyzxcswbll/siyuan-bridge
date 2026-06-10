@@ -25,14 +25,6 @@ class SiyuanClient:
 
         self._client = httpx.AsyncClient(base_url=base_url, headers=headers, timeout=15.0)
 
-    async def _get_default_notebook(self) -> str:
-        """获取第一个可用的笔记本 ID。"""
-        resp = await self._call_api("/api/notebook/lsNotebooks", {})
-        notebooks = resp.get("notebooks", []) if resp else []
-        if notebooks:
-            return notebooks[0]["id"]
-        return ""
-
     async def create_doc(
         self,
         markdown: str,
@@ -40,9 +32,9 @@ class SiyuanClient:
         title: str = "",
         path: str = "",
     ) -> CreateDocResponse:
-        """在思源中创建文档。notebook_id 为空时自动选第一个笔记本。"""
+        """在思源中创建文档。notebook_id 必填（调用 sy-notebooks 获取）。"""
         if not notebook_id:
-            notebook_id = await self._get_default_notebook()
+            raise ValueError("no_notebook")
 
         data = CreateDocRequest(
             markdown=markdown,
@@ -77,9 +69,9 @@ class SiyuanClient:
         return [SearchNotesResult(**item) for item in raw_results]
 
     async def get_or_create_daily_note(self, notebook_id: str = "") -> str:
-        """获取或创建今日日记，返回文档 ID。"""
+        """获取或创建今日日记。notebook_id 必填（调用 sy-notebooks 获取）。"""
         if not notebook_id:
-            notebook_id = await self._get_default_notebook()
+            raise ValueError("no_notebook")
         payload: dict[str, Any] = {"notebook": notebook_id}
         resp = await self._call_api("/api/filetree/createDailyNote", payload)
         # API 返回 data 为文档 ID 字符串
