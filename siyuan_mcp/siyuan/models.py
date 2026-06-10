@@ -34,3 +34,20 @@ class SearchNotesResult(BaseModel):
     path: str = ""
     score: float = 0.0
     updated: Optional[str] = None
+
+
+class AppendBlockRequest(BaseModel):
+    """追加块的请求参数。"""
+    parent_id: str
+    data: str
+    domain_type: int = 0
+    parent_type: str = "d"  # d=文档, h=标题块
+    type: str = "markdown"
+
+    def model_dump(self, **kwargs) -> dict:
+        d = super().model_dump(**kwargs)
+        # Siyuan API 使用 camelCase
+        d["parentID"] = d.pop("parent_id")
+        d["domainType"] = d.pop("domain_type")
+        d["parentType"] = d.pop("parent_type")
+        return d

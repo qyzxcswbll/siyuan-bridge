@@ -6,6 +6,7 @@ import httpx
 
 from siyuan_mcp.config.loader import Config
 from siyuan_mcp.siyuan.models import (
+    AppendBlockRequest,
     CreateDocRequest,
     CreateDocResponse,
     SearchNotesResult,
@@ -64,6 +65,28 @@ class SiyuanClient:
         raw_results = resp if isinstance(resp, list) else resp.get("results", resp)
 
         return [SearchNotesResult(**item) for item in raw_results]
+
+    async def get_or_create_daily_note(self, notebook_id: str = "") -> str:
+        """获取或创建今日日记，返回文档 ID。
+
+        调用思源 createDailyNote API。
+        """
+        payload: dict[str, Any] = {}
+        if notebook_id:
+            payload["notebookId"] = notebook_id
+        resp = await self._call_api("/api/filetree/createDailyNote", payload)
+        return resp.get("id", "")
+
+    async def append_block(self, parent_id: str, content: str) -> list[dict]:
+        """向指定块追加内容。
+
+        使用思源 appendBlock API 在文档末尾追加 Markdown 块。
+        """
+        data = AppendBlockRequest(
+            parent_id=parent_id,
+            data=content,
+        ).model_dump()
+        return await self._call_api("/api/block/appendBlock", data)
 
     async def _call_api(self, path: str, data: dict[str, Any]) -> Any:
         """调用思源 API 并处理错误。"""

@@ -127,3 +127,54 @@ async def test_api_error_response(config):
 
         with pytest.raises(ValueError, match="Token 无效"):
             await client.create_doc("# test")
+
+
+# ── 日记功能测试 ─────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_or_create_daily_note_success(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0,
+        "msg": "",
+        "data": {"id": "daily-note-123", "title": "2026-06-10"},
+    }
+
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+
+        doc_id = await client.get_or_create_daily_note()
+        assert doc_id == "daily-note-123"
+
+
+@pytest.mark.asyncio
+async def test_append_block_success(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0,
+        "msg": "",
+        "data": [{"id": "new-block-id"}],
+    }
+
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+
+        result = await client.append_block("parent-123", "# 测试内容")
+        assert len(result) == 1
+        assert result[0]["id"] == "new-block-id"
+
+
+@pytest.mark.asyncio
+async def test_append_block_camelcase_serialization(config):
+    """验证 appendBlock 请求使用 camelCase 字段名。"""
+    from siyuan_mcp.siyuan.models import AppendBlockRequest
+    req = AppendBlockRequest(parent_id="pid", data="content")
+    dumped = req.model_dump()
+    assert "parentID" in dumped
+    assert "parent_id" not in dumped
+    assert dumped["parentID"] == "pid"
+    assert dumped["domainType"] == 0

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 from siyuan_mcp.server import (
     _handle_sy_save,
+    _handle_sy_today,
     _handle_sy_find,
     _handle_code_find,
 )
@@ -28,6 +29,44 @@ async def test_sy_find_empty_query():
 async def test_code_find_empty_query():
     result = await _handle_code_find({"query": ""})
     assert "不能为空" in result[0].text
+
+
+# ── sy-today 测试 ────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sy_today_empty_content():
+    result = await _handle_sy_today({"content": ""})
+    assert "不能为空" in result[0].text
+
+
+@pytest.mark.asyncio
+async def test_sy_today_success():
+    import siyuan_mcp.server as srv
+    srv._siyuan_client = AsyncMock()
+    srv._siyuan_client.get_or_create_daily_note.return_value = "daily-123"
+    srv._siyuan_client.append_block.return_value = [{"id": "block-1"}]
+
+    try:
+        result = await _handle_sy_today({"content": "# 今日工作"})
+        assert "已追加到今日日记" in result[0].text
+        assert "daily-123" in result[0].text
+    finally:
+        srv._siyuan_client = None
+        srv._config = None
+
+
+@pytest.mark.asyncio
+async def test_sy_today_no_daily_note():
+    import siyuan_mcp.server as srv
+    srv._siyuan_client = AsyncMock()
+    srv._siyuan_client.get_or_create_daily_note.return_value = ""
+
+    try:
+        result = await _handle_sy_today({"content": "# 测试"})
+        assert "无法创建今日日记" in result[0].text
+    finally:
+        srv._siyuan_client = None
+        srv._config = None
 
 
 # ── 错误处理测试 ─────────────────────────────

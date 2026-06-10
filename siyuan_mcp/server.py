@@ -59,6 +59,20 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="sy-today",
+            description="保存内容到今日日记。将 Markdown 内容追加到思源笔记当天的日记文档中。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "要追加到日记的内容（Markdown 格式）",
+                    },
+                },
+                "required": ["content"],
+            },
+        ),
+        types.Tool(
             name="sy-find",
             description="搜索思源笔记知识库。支持普通关键词搜索和 AI 语义搜索两种模式。",
             inputSchema={
@@ -125,6 +139,7 @@ async def handle_call_tool(
 
     handlers = {
         "sy-save": _handle_sy_save,
+        "sy-today": _handle_sy_today,
         "sy-find": _handle_sy_find,
         "code-find": _handle_code_find,
     }
@@ -170,6 +185,31 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
+
+
+# ── sy-today ─────────────────────────────────────
+
+async def _handle_sy_today(args: dict) -> list[types.TextContent]:
+    content = args.get("content", "")
+    if not content.strip():
+        return [types.TextContent(type="text", text="❌ 内容不能为空")]
+
+    try:
+        doc_id = await _siyuan_client.get_or_create_daily_note()
+        if not doc_id:
+            return [types.TextContent(
+                type="text", text="❌ 无法创建今日日记，请检查思源设置"
+            )]
+
+        await _siyuan_client.append_block(doc_id, content)
+        return [types.TextContent(
+            type="text",
+            text=f"✅ 已追加到今日日记\n- 文档 ID：`{doc_id}`\n- 链接：siyuan://blocks/{doc_id}",
+        )]
+    except ConnectionError as e:
+        return [types.TextContent(type="text", text=f"❌ {e}")]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"❌ 写入日记失败：{e}")]
 
 
 # ── sy-find ──────────────────────────────────────
