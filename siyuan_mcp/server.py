@@ -14,6 +14,22 @@ from siyuan_mcp.config.loader import ConfigLoader
 from siyuan_mcp.siyuan.client import SiyuanClient
 from siyuan_mcp.codebase.search import CodebaseSearcher
 
+
+# ── 工具函数 ──────────────────────────────────────
+
+def _format_doc_result(result, action: str, location: str = "") -> str:
+    """格式化保存结果消息，兼容 ID 为空的情况。"""
+    lines = [f"✅ 已{action}到思源"]
+    if location:
+        lines[0] += f"（{location}）"
+    if result.id:
+        lines.append(f"- 文档 ID：`{result.id}`")
+    if result.title:
+        lines.append(f"- 标题：{result.title}")
+    if result.id:
+        lines.append(f"- 链接：siyuan://blocks/{result.id}")
+    return "\n".join(lines)
+
 # ── 全局状态 ──────────────────────────────────────
 _config = None
 _siyuan_client = None
@@ -204,12 +220,7 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         return [
             types.TextContent(
                 type="text",
-                text=(
-                    f"✅ 已保存到思源（{location}）\n"
-                    f"- 文档 ID：`{result.id}`\n"
-                    f"- 标题：{result.title}\n"
-                    f"- 链接：siyuan://blocks/{result.id}"
-                ),
+                text=_format_doc_result(result, "保存", location),
             )
         ]
     except ConnectionError as e:
@@ -318,15 +329,15 @@ async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
             title=title,
             path=path,
         )
+        link = f"\n- 链接：siyuan://blocks/{result.id}" if result.id else ""
         return [
             types.TextContent(
                 type="text",
                 text=(
                     f"✅ 已自动保存（来源：{source}）\n"
                     f"- 项目：{name}\n"
-                    f"- 文档 ID：`{result.id}`\n"
-                    f"- 标题：{result.title}\n"
-                    f"- 链接：siyuan://blocks/{result.id}"
+                    f"- 标题：{result.title}"
+                    f"{link}"
                 ),
             )
         ]

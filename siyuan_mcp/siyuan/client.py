@@ -40,9 +40,12 @@ class SiyuanClient:
             path=path,
         ).model_dump()
         resp = await self._call_api("/api/filetree/createDocWithMd", data)
+        # 思源 v3.6.5 创建成功后不返回 data，但文档已创建
+        # 尝试先按有 ID 的情况取，没有则用路径代替
+        doc_id = resp.get("id") if resp else ""
         return CreateDocResponse(
-            id=resp.get("id", ""),
-            title=resp.get("title", title or "未命名"),
+            id=doc_id or "",
+            title=resp.get("title") if resp and "title" in resp else (title or "未命名"),
         )
 
     async def search_notes(
@@ -64,7 +67,7 @@ class SiyuanClient:
         )
 
         resp = await self._call_api(api_path, payload)
-        raw_results = resp if isinstance(resp, list) else resp.get("results", resp)
+        raw_results = resp if isinstance(resp, list) else resp.get("results", [])
 
         return [SearchNotesResult(**item) for item in raw_results]
 
@@ -110,7 +113,7 @@ class SiyuanClient:
                 f"思源 API 错误：{body.get('msg', '未知错误')}"
             )
 
-        return body.get("data", {})
+        return body.get("data") or {}  # data 可能为 null，回退为空字典
 
     async def close(self):
         await self._client.aclose()
