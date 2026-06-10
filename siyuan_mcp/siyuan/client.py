@@ -78,11 +78,12 @@ class SiyuanClient:
 
     async def get_or_create_daily_note(self, notebook_id: str = "") -> str:
         """获取或创建今日日记，返回文档 ID。"""
-        payload: dict[str, Any] = {}
-        if notebook_id:
-            payload["notebookId"] = notebook_id
+        if not notebook_id:
+            notebook_id = await self._get_default_notebook()
+        payload: dict[str, Any] = {"notebook": notebook_id}
         resp = await self._call_api("/api/filetree/createDailyNote", payload)
-        return resp.get("id", "")
+        # API 返回 data 为文档 ID 字符串
+        return resp if isinstance(resp, str) else (resp.get("id", "") if resp else "")
 
     async def append_block(self, parent_id: str, content: str) -> list[dict]:
         """向指定块追加内容。"""
