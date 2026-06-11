@@ -262,6 +262,13 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
             _notebook_mapper.set_notebooks(notebooks)
             notebook_id = _notebook_mapper.resolve(notebook_spec)
 
+        # 取笔记本名称
+        notebook_name = notebook_spec
+        for nb in _notebook_mapper._notebooks:
+            if nb.id == notebook_id:
+                notebook_name = nb.name
+                break
+
         # 匹配项目（可选）
         name = _match_project(content)
 
@@ -277,7 +284,7 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
             title=title,
         )
 
-        text = f"✅ 已保存\n- 标题：{result.title}"
+        text = f"✅ 已保存\n- 📂 {notebook_name}/{result.title}"
         if result.id:
             text += f"\n- 🔗 siyuan://blocks/{result.id}"
         return [types.TextContent(type="text", text=text)]

@@ -33,7 +33,10 @@ class NotebookMapper:
                 )
             return self._notebooks[idx].id
 
-        # 名称模式："AI知识体系" → 模糊匹配
+        # 名称模式：精确匹配优先，模糊匹配回退
+        for nb in self._notebooks:
+            if spec == nb.name:
+                return nb.id
         for nb in self._notebooks:
             if spec in nb.name or nb.name in spec:
                 return nb.id
