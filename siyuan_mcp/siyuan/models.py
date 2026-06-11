@@ -63,3 +63,11 @@ class NotebookInfo(BaseModel):
     id: str
     name: str
     closed: bool = False
+
+
+class GetDocResponse(BaseModel):
+    """读取文档的响应。"""
+    id: str
+    content: str = ""
+    path: str = ""
+    title: str = ""

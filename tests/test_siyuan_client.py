@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 from siyuan_mcp.siyuan.models import (
     CreateDocRequest,
     CreateDocResponse,
+    GetDocResponse,
     NotebookInfo,
     SearchNotesRequest,
     SearchNotesResult,
@@ -228,3 +229,57 @@ async def test_list_notebooks_empty(config):
 
         result = await client.list_notebooks()
         assert result == []
+
+
+# ── 新增 API 测试 ─────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_doc_success(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0, "msg": "",
+        "data": {
+            "id": "doc-123",
+            "content": "# 测试内容\n正文",
+            "path": "/测试",
+            "title": "测试内容",
+        },
+    }
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+        result = await client.get_doc("doc-123")
+        assert result.id == "doc-123"
+        assert "测试内容" in result.content
+
+
+@pytest.mark.asyncio
+async def test_remove_doc_success(config):
+    client = SiyuanClient(config)
+    mock_response = {"code": 0, "msg": "", "data": None}
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+        result = await client.remove_doc("nb-1", "/test/doc")
+        assert result is True
+
+
+@pytest.mark.asyncio
+async def test_list_docs_success(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0, "msg": "",
+        "data": [
+            {"id": "doc-1", "title": "文档1", "path": "/文档1"},
+            {"id": "doc-2", "title": "文档2", "path": "/文件夹/文档2"},
+        ],
+    }
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+        result = await client.list_docs("nb-1")
+        assert len(result) == 2
+        assert result[0]["id"] == "doc-1"
