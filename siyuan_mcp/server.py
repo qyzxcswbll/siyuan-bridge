@@ -9,6 +9,7 @@ import mcp.server.stdio
 import mcp.types as types
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
+from mcp.types import ServerCapabilities, ToolsCapability
 
 from siyuan_mcp.config.loader import ConfigLoader
 from siyuan_mcp.siyuan.client import SiyuanClient
@@ -425,6 +426,9 @@ async def amain() -> int:
                 InitializationOptions(
                     server_name="siyuan-mcp",
                     server_version="0.1.0",
+                    capabilities=ServerCapabilities(
+                        tools=ToolsCapability(listChanged=False),
+                    ),
                 ),
             )
         return 0
