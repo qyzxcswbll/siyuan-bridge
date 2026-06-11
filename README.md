@@ -30,6 +30,8 @@
 
 ```bash
 pip install siyuan-mcp
+# 或通过 npx（自动安装 Python 依赖）
+npx siyuan-mcp
 ```
 
 或从源码安装：
@@ -55,6 +57,19 @@ cp config.yaml.example config.yaml
     "siyuan-mcp": {
       "command": "python",
       "args": ["-m", "siyuan_mcp"]
+    }
+  }
+}
+```
+
+或通过 npx（自动拉取 Python 依赖）：
+
+```json
+{
+  "mcpServers": {
+    "siyuan-mcp": {
+      "command": "npx",
+      "args": ["-y", "siyuan-mcp"]
     }
   }
 }

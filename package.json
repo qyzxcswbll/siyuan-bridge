@@ -1,0 +1,13 @@
+{
+  "name": "siyuan-mcp",
+  "version": "0.1.0",
+  "description": "MCP server connecting Claude with Siyuan Note — Python wrapper for npx compatibility",
+  "bin": {
+    "siyuan-mcp": "bin/siyuan-mcp.js"
+  },
+  "scripts": {
+    "postinstall": "pip install siyuan-mcp -q"
+  },
+  "repository": "github:qyzxcswbll/siyuan-bridge",
+  "license": "MIT"
+}
