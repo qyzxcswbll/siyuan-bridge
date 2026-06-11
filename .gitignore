@@ -23,3 +23,5 @@ build/
 config.yaml
 rg.zip
 .claude/sy-content.md
+*.egg-info
+dist/
