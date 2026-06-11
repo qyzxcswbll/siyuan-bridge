@@ -1,0 +1,95 @@
+<h2>sy-last 完整流程</h2>
+
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;font-family:'Segoe UI',sans-serif;margin-top:10px">
+
+  <!-- 开始 -->
+  <div style="border:2px solid #1565C0;border-radius:25px;background:#E3F2FD;padding:12px 30px;min-width:300px;text-align:center;font-weight:bold;color:#0D47A1;font-size:14px">
+    用户：sy-last 临时使用
+  </div>
+  <div style="font-size:18px;color:#666">↓</div>
+
+  <!-- AI 提取 -->
+  <div style="border:2px solid #E65100;border-radius:10px;background:#FFF3E0;padding:12px 24px;min-width:380px;text-align:center;font-size:13px;color:#BF360C">
+    <b>AI 提取最后一次交互内容</b><br>
+    <span style="font-size:12px;color:#795548">保留原始格式（含图片 / 文件链接）</span>
+  </div>
+  <div style="font-size:18px;color:#666">↓</div>
+
+  <!-- 校验 -->
+  <table style="border-collapse:collapse"><tr>
+    <td style="padding:0;position:relative">
+      <div style="border:2px solid #FF8F00;border-radius:8px;background:#FFECB3;padding:10px 16px;min-width:140px;text-align:center;font-weight:bold;font-size:13px;color:#E65100">
+        内容 &lt; 30 字？
+      </div>
+    </td>
+  </tr></table>
+
+  <table style="border-collapse:collapse"><tr>
+    <td style="padding-right:25px;position:relative;text-align:center">
+      <div style="border:1px solid #E53935;border-radius:6px;background:#FFEBEE;padding:8px 12px;min-width:220px;font-size:11px;color:#C62828">
+        ⚠️ 内容过短，拒绝<br>
+        <span style="font-size:10px">请提供完整笔记内容</span>
+      </div>
+      <div style="position:absolute;top:-18px;left:50%;font-size:12px;font-weight:bold;color:#C62828">是</div>
+    </td>
+    <td style="padding-left:25px;text-align:center;position:relative">
+      <div style="border:1px solid #43A047;border-radius:10px;background:#E8F5E9;padding:12px 24px;min-width:300px;font-size:13px;color:#1B5E20;font-weight:bold">
+        调用 sy-save（预览模式）
+      </div>
+      <div style="position:absolute;top:-18px;left:50%;font-size:12px;font-weight:bold;color:#2E7D32">否</div>
+    </td>
+  </tr></table>
+
+  <div style="font-size:18px;color:#666">↓</div>
+
+  <!-- 预览 -->
+  <div style="border:2px solid #E65100;border-radius:10px;background:#FFF8E1;padding:14px 24px;min-width:450px;text-align:left;font-size:12px;line-height:1.6">
+    <div style="text-align:center;font-weight:bold;font-size:14px;color:#E65100;margin-bottom:8px">预览确认</div>
+    <div style="background:white;border-radius:6px;padding:10px 14px;border:1px solid #FFE0B2">
+      <span style="color:#1565C0;font-weight:bold">📓</span> 笔记本：临时使用<br>
+      <span style="color:#1565C0;font-weight:bold">📝</span> 标题：sy-list<br>
+      <span style="color:#1565C0;font-weight:bold">🏷️</span> 标签：AI、sy、list<br>
+      <hr style="border:none;border-top:1px dashed #ddd;margin:6px 0">
+      > 用户：sy-list<br>
+      > 助手：📚 笔记本列表...<br>
+      <hr style="border:none;border-top:1px dashed #ddd;margin:6px 0">
+      <span style="font-weight:bold">确认保存？(y/N)</span>
+    </div>
+  </div>
+
+  <div style="font-size:18px;color:#666">↓</div>
+
+  <!-- 决策 -->
+  <table style="border-collapse:collapse"><tr>
+    <td style="padding:0;position:relative">
+      <div style="border:2px solid #FF8F00;border-radius:8px;background:#FFECB3;padding:10px 16px;min-width:140px;text-align:center;font-weight:bold;font-size:13px;color:#E65100">
+        用户确认？
+      </div>
+    </td>
+  </tr></table>
+
+  <table style="border-collapse:collapse"><tr>
+    <td style="padding-right:25px;text-align:center;position:relative">
+      <div style="border:2px solid #43A047;border-radius:10px;background:#E8F5E9;padding:12px 20px;min-width:260px;font-size:13px;color:#1B5E20">
+        <b>sy-save(confirmed=true)</b><br>
+        <span style="font-size:11px">POST /api/filetree/createDocWithMd</span>
+      </div>
+      <div style="position:absolute;top:-18px;left:50%;font-size:14px;font-weight:bold;color:#2E7D32">y</div>
+    </td>
+    <td style="padding-left:25px;text-align:center;position:relative">
+      <div style="border:1px solid #E53935;border-radius:6px;background:#FFEBEE;padding:8px 16px;min-width:160px;font-size:12px;color:#C62828">
+        取消保存，不写入
+      </div>
+      <div style="position:absolute;top:-18px;left:50%;font-size:14px;font-weight:bold;color:#C62828">N</div>
+    </td>
+  </tr></table>
+
+  <div style="font-size:18px;color:#666">↓</div>
+
+  <!-- 结果 -->
+  <div style="border:2px solid #6A1B9A;border-radius:10px;background:#F3E5F5;padding:14px 24px;min-width:380px;text-align:center;font-size:13px;line-height:1.6">
+    <span style="font-size:24px">✅</span> <b>已保存</b><br>
+    <span style="color:#4A148C">📓 临时使用 / sy-list<br>🔗 siyuan://blocks/202606...</span>
+  </div>
+
+</div>

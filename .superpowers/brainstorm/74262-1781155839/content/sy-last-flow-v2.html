@@ -1,0 +1,89 @@
+<h2 style="color:#ffffff;text-shadow:0 0 10px rgba(255,255,255,0.3)">sy-last 完整流程</h2>
+
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-family:'Segoe UI',sans-serif;margin-top:15px">
+
+  <!-- Step 1 -->
+  <div style="border:2px solid #64B5F6;border-radius:25px;background:linear-gradient(135deg,#1565C0,#1976D2);padding:14px 35px;min-width:320px;text-align:center;font-weight:bold;color:#ffffff;font-size:15px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+    👤 用户：sy-last 临时使用
+  </div>
+  <div style="font-size:20px;color:#90CAF9;font-weight:bold">↓</div>
+
+  <!-- Step 2 -->
+  <div style="border:2px solid #FFB74D;border-radius:12px;background:linear-gradient(135deg,#E65100,#EF6C00);padding:14px 28px;min-width:400px;text-align:center;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+    <div style="font-weight:bold;font-size:14px;color:#ffffff">🤖 AI 提取最后一次交互内容</div>
+    <div style="font-size:12px;color:#FFE0B2;margin-top:3px">保留原始格式（含图片 / 文件链接）</div>
+  </div>
+  <div style="font-size:20px;color:#90CAF9;font-weight:bold">↓</div>
+
+  <!-- Decision 1 -->
+  <div style="border:2px solid #FFD54F;border-radius:10px;background:linear-gradient(135deg,#F57F17,#F9A825);padding:12px 20px;min-width:160px;text-align:center;font-weight:bold;font-size:14px;color:#ffffff;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+    🔀 内容 &lt; 30 字？
+  </div>
+
+  <table style="border-collapse:collapse"><tr>
+    <!-- Yes branch -->
+    <td style="text-align:center;vertical-align:top;padding-right:30px">
+      <div style="font-size:13px;font-weight:bold;color:#EF5350;margin-bottom:2px">是</div>
+      <div style="border:2px solid #EF5350;border-radius:8px;background:#C62828;padding:10px 16px;min-width:200px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+        <div style="font-size:12px;color:#ffffff">⚠️ 拒绝保存</div>
+        <div style="font-size:11px;color:#FFCDD2">内容过短，请提供完整内容</div>
+      </div>
+    </td>
+    <!-- No branch -->
+    <td style="text-align:center;vertical-align:top;padding-left:30px">
+      <div style="font-size:13px;font-weight:bold;color:#66BB6A;margin-bottom:2px">否</div>
+      <div style="border:2px solid #66BB6A;border-radius:8px;background:#2E7D32;padding:12px 20px;min-width:250px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+        <div style="font-size:13px;font-weight:bold;color:#ffffff">继续 → 调用 sy-save（预览）</div>
+      </div>
+    </td>
+  </tr></table>
+
+  <div style="font-size:20px;color:#90CAF9;font-weight:bold">↓</div>
+
+  <!-- Preview -->
+  <div style="border:2px solid #FFB74D;border-radius:12px;background:#1a1a2e;padding:14px 24px;min-width:480px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+    <div style="text-align:center;font-weight:bold;font-size:15px;color:#FFB74D;margin-bottom:10px">📋 预览确认</div>
+    <div style="background:#16213e;border-radius:8px;padding:12px 16px;border:1px solid #0f3460;font-size:13px;line-height:1.8;color:#e0e0e0">
+      📓 笔记本：临时使用<br>
+      📝 标题：sy-list<br>
+      🏷️  标签：AI、sy、list<br>
+      <hr style="border:none;border-top:1px solid #0f3460;margin:6px 0">
+      <span style="color:#90CAF9">&gt; 用户：</span>sy-list<br>
+      <span style="color:#A5D6A7">&gt; 助手：</span>📚 笔记本列表：1. 临时使用...<br>
+      <hr style="border:none;border-top:1px solid #0f3460;margin:6px 0">
+      <span style="color:#FFB74D;font-weight:bold">确认保存？(y/N)</span>
+    </div>
+  </div>
+
+  <div style="font-size:20px;color:#90CAF9;font-weight:bold">↓</div>
+
+  <!-- Decision 2 -->
+  <div style="border:2px solid #FFD54F;border-radius:10px;background:linear-gradient(135deg,#F57F17,#F9A825);padding:12px 20px;min-width:160px;text-align:center;font-weight:bold;font-size:14px;color:#ffffff;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+    🔀 用户确认？
+  </div>
+
+  <table style="border-collapse:collapse"><tr>
+    <td style="text-align:center;vertical-align:top;padding-right:30px">
+      <div style="font-size:14px;font-weight:bold;color:#66BB6A;margin-bottom:2px">Y</div>
+      <div style="border:2px solid #66BB6A;border-radius:10px;background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:12px 20px;min-width:280px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+        <div style="font-weight:bold;font-size:13px;color:#ffffff">sy-save(confirmed=true)</div>
+        <div style="font-size:11px;color:#A5D6A7;margin-top:3px">POST /api/filetree/createDocWithMd</div>
+      </div>
+      <!-- Result -->
+      <div style="font-size:20px;color:#90CAF9;font-weight:bold;margin:4px 0">↓</div>
+      <div style="border:2px solid #CE93D8;border-radius:10px;background:linear-gradient(135deg,#4A148C,#6A1B9A);padding:14px 20px;min-width:280px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+        <div style="font-size:22px">✅</div>
+        <div style="font-weight:bold;font-size:14px;color:#ffffff;margin-top:4px">已保存</div>
+        <div style="font-size:12px;color:#CE93D8;margin-top:4px">📓 临时使用 / sy-list<br>🔗 siyuan://blocks/202606...</div>
+      </div>
+    </td>
+    <td style="text-align:center;vertical-align:top;padding-left:30px">
+      <div style="font-size:14px;font-weight:bold;color:#EF5350;margin-bottom:2px">N</div>
+      <div style="border:2px solid #EF5350;border-radius:8px;background:#C62828;padding:12px 16px;min-width:180px;box-shadow:0 3px 8px rgba(0,0,0,0.3)">
+        <div style="font-size:13px;color:#ffffff">❌ 取消保存</div>
+        <div style="font-size:11px;color:#FFCDD2">内容不写入思源</div>
+      </div>
+    </td>
+  </tr></table>
+
+</div>

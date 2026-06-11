@@ -139,14 +139,36 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
-            name="sy-save",
-            description="保存笔记到思源。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。内容以 @ 开头可自动读取文件。默认 notebook 为空时保存到索引0（第一个笔记本）。",
+            name="sy-last",
+            description="保存最后一条对话内容到思源笔记。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "content": {
                         "type": "string",
-                        "description": "笔记内容（Markdown 格式）或以 @ 开头的文件路径",
+                        "description": "笔记内容（由 AI 自动填入最后一次对话内容）",
+                    },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，笔记本序号或名称。不指定则用默认笔记本（索引0）",
+                    },
+                    "confirmed": {
+                        "type": "boolean",
+                        "description": "确认标记。传 true 时实际写入，false 或省略时仅返回预览（默认 false）",
+                    },
+                },
+                "required": ["content"],
+            },
+        ),
+        types.Tool(
+            name="sy-session",
+            description="保存整个会话内容到思源笔记。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "笔记内容（由 AI 自动填入整个对话内容）",
                     },
                     "notebook": {
                         "type": "string",
@@ -213,7 +235,8 @@ async def handle_call_tool(
 
     handlers = {
         "sy-list": _handle_sy_list,
-        "sy-save": _handle_sy_save,
+        "sy-last": _handle_sy_save,
+        "sy-session": _handle_sy_save,
         "sy-find": _handle_sy_find,
     }
 

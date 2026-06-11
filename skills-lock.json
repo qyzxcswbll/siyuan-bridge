@@ -7,6 +7,12 @@
       "skillPath": "skills/diagram-to-image/SKILL.md",
       "computedHash": "040f5e3c996d106f609aac7c8b77444aa12895018b57cae838db22f379fff7d0"
     },
+    "drawio": {
+      "source": "jgraph/drawio-mcp",
+      "sourceType": "github",
+      "skillPath": "skill-cli/drawio/SKILL.md",
+      "computedHash": "b33821c1d01e10274e03a27de28225feb72d45fb98777b8455e7958dd783fe0f"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",
