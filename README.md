@@ -87,10 +87,10 @@ siyuan-mcp init
 sy-notebook                    → 列出所有笔记本
 sy-list 临时使用               → 列出笔记本下的文档（含 ID）
 sy-save 把这段内容保存到思源    → 直接写入文档
-sy-read siyuan://blocks/xxx    → 读取文档内容（含标题）
-sy-delete siyuan://blocks/xxx  → 删除文档
-sy-find OAuth2                 → 搜索知识库
-sy-find fn main mode=code      → 搜索本地代码
+sy-read <id>                 → 读取文档内容（ID 通过 sy-list 获取）
+sy-delete <id>               → 删除文档（ID 通过 sy-list 获取）
+sy-find OAuth2               → 搜索知识库
+sy-find fn main mode=code    → 搜索本地代码
 ```
 
 ## 配置项
@@ -137,10 +137,6 @@ siyuan-mcp/
 ```
 
 ## 设计原则
-
-参考 [obsidian-mcp](https://github.com/newtype-01/obsidian-mcp) 的低层级设计哲学：
-
-> 每个工具只做一件事，不做猜测。
 
 AI 负责内容生成，MCP 负责内容存储。工具不承诺"智能"行为。
 
