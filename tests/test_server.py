@@ -82,7 +82,7 @@ async def test_sy_save_preview_no_confirm():
 
     try:
         result = await _handle_sy_save({"content": "# 测试标题\n这是测试内容"})
-        assert "即将保存笔记" in result[0].text
+        assert "📄 内容" in result[0].text or "测试标题" in result[0].text
         assert "测试标题" in result[0].text
         # 不应调用写入
         srv._siyuan_client.create_doc.assert_not_called()

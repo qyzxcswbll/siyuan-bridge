@@ -281,6 +281,11 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         if len(content.strip()) < 30 and not content.strip().startswith("#"):
             return [types.TextContent(type="text", text="⚠️ 内容过短，请提供完整的笔记内容或明确标注「last/最后一次」「session/整个会话」")]
 
+        # 对话真实性校验：预览时检查是否包含对话标记
+        _HAS_DIALOG = bool(re.search(r'>\s*\*\*用户.*?\*\*|>\s*\*\*助手.*?\*\*', content))
+        if not _HAS_DIALOG:
+            source = f"{source}（缺少对话标记）"
+
         # 提取标题
         title = _extract_title(content)
 
@@ -325,9 +330,9 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
             lines = []
             if is_full_conversation:
                 lines.append("⚠️ **即将保存整个对话内容**")
-                lines.append(f"（共约 {total_lines + 1} 行，{len(content)} 字符）")
-            else:
-                lines.append("即将保存笔记：")
+            lines.append(f"📄 内容：{len(content)} 字，{total_lines + 1} 行")
+            if not _HAS_DIALOG:
+                lines.append("⚠️ 缺少对话标记，请确认内容来源完整")
             lines.append("")
             lines.append(f"  📓 笔记本：{notebook_name or '默认'}")
             lines.append(f"  📝 标题：{title}")
