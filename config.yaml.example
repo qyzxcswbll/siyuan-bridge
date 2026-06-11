@@ -11,9 +11,6 @@ siyuan:
   # API Token（在思源设置 → 关于 → API Token 中获取）
   # 留空表示不鉴权（仅限本地使用）
   token: ""
-  # 思源工作空间路径
-  # 留空自动检测，如需指定可填如：
-  # workspace: "C:/Users/xxx/.siyuan/workspace"
 
 # ── 代码库关联 ────────────────────────────────────
 codebase:
@@ -30,16 +27,7 @@ codebase:
 
 # ── 搜索设置 ──────────────────────────────────────
 search:
-  # 默认搜索模式: normal（关键词）| ai（语义搜索）
-  default_mode: "normal"
   # 默认最大返回结果数
   max_results: 10
   # ripgrep 命令路径（默认在 PATH 中查找）
   rg_path: "rg"
-
-# ── 存储设置 ──────────────────────────────────────
-storage:
-  # 默认笔记本 ID（空=使用思源默认笔记本）
-  default_notebook: ""
-  # 收集箱路径
-  inbox_path: "/"

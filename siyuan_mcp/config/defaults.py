@@ -10,18 +10,12 @@ def get_defaults() -> dict[str, Any]:
             "host": "127.0.0.1",
             "port": 6806,
             "token": "",
-            "workspace": "",
         },
         "codebase": {
             "repos": [],
         },
         "search": {
-            "default_mode": "normal",
             "max_results": 10,
             "rg_path": "rg",
-        },
-        "storage": {
-            "default_notebook": "",
-            "inbox_path": "/",
         },
     }

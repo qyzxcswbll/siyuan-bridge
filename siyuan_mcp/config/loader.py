@@ -20,7 +20,6 @@ class SiyuanConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 6806
     token: str = ""
-    workspace: str = ""
 
 
 class CodebaseConfig(BaseModel):
@@ -28,21 +27,14 @@ class CodebaseConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
-    default_mode: str = "normal"
     max_results: int = 10
     rg_path: str = "rg"
-
-
-class StorageConfig(BaseModel):
-    default_notebook: str = ""
-    inbox_path: str = "/"
 
 
 class Config(BaseModel):
     siyuan: SiyuanConfig = SiyuanConfig()
     codebase: CodebaseConfig = CodebaseConfig()
     search: SearchConfig = SearchConfig()
-    storage: StorageConfig = StorageConfig()
 
 
 # 环境变量到配置路径的映射：(env_key, (section, field))
@@ -50,12 +42,8 @@ _ENV_MAP: list[tuple[str, tuple[str, str]]] = [
     ("SIYUAN_HOST", ("siyuan", "host")),
     ("SIYUAN_PORT", ("siyuan", "port")),
     ("SIYUAN_TOKEN", ("siyuan", "token")),
-    ("SIYUAN_WORKSPACE", ("siyuan", "workspace")),
     ("CODEBASE_REPOS", ("codebase", "repos")),
-    ("SEARCH_DEFAULT_MODE", ("search", "default_mode")),
     ("SEARCH_MAX_RESULTS", ("search", "max_results")),
-    ("STORAGE_DEFAULT_NOTEBOOK", ("storage", "default_notebook")),
-    ("STORAGE_INBOX_PATH", ("storage", "inbox_path")),
 ]
 
 

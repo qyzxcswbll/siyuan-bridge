@@ -15,7 +15,7 @@ def test_get_defaults_returns_expected_structure():
     assert "siyuan" in defaults
     assert "codebase" in defaults
     assert "search" in defaults
-    assert "storage" in defaults
+    assert "storage" not in defaults
 
 
 def test_siyuan_defaults():
@@ -24,13 +24,11 @@ def test_siyuan_defaults():
     assert siyuan["host"] == "127.0.0.1"
     assert siyuan["port"] == 6806
     assert siyuan["token"] == ""
-    assert siyuan["workspace"] == ""
 
 
 def test_search_defaults():
     defaults = get_defaults()
     search = defaults["search"]
-    assert search["default_mode"] == "normal"
     assert search["max_results"] == 10
     assert search["rg_path"] == "rg"
 
