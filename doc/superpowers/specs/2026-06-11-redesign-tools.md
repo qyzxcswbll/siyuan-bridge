@@ -2,6 +2,7 @@
 
 > 日期: 2026-06-11
 > 状态: 待实现
+> 参考图: [architecture.png](../architecture.png) | [sy-save-flow.png](../sy-save-flow.png)
 
 ---
 
@@ -176,81 +177,31 @@ query + mode
 
 ---
 
-## 笔记本映射实现
+## 笔记本映射机制
 
-```python
-class NotebookMapper:
-    """笔记本序号/名称 → notebook_id 映射。"""
-    
-    def __init__(self):
-        self._notebooks = []  # list[NotebookInfo]
-    
-    async def refresh(self, client: SiyuanClient):
-        """在 _ensure_initialized 时加载笔记本列表。"""
-        raw = await client.list_notebooks()
-        self._notebooks = raw  # 保持序号对应索引
-    
-    def resolve(self, spec: str = "") -> str:
-        """解析用户输入的笔记本引用，返回 notebook_id。"""
-        if not spec:
-            return self._notebooks[0].id  # 默认索引 0
-        
-        # 序号模式："1" → 索引 0
-        if spec.isdigit():
-            idx = int(spec) - 1
-            if idx < 0 or idx >= len(self._notebooks):
-                raise ValueError(f"笔记本序号超出范围（1-{len(self._notebooks)}）")
-            return self._notebooks[idx].id
-        
-        # 名称模式："AI知识体系" → 模糊匹配
-        for nb in self._notebooks:
-            if spec in nb.name or nb.name in spec:
-                return nb.id
-        raise ValueError(f"未找到笔记本「{spec}」")
-    
-    def format_list(self) -> str:
-        """格式化为 sy-list 输出。"""
-        lines = ["📚 思源笔记本列表：\n"]
-        for i, nb in enumerate(self._notebooks, 1):
-            marker = " ← 当前默认" if i - 1 == 0 else ""
-            lock = " 🔒" if nb.closed else ""
-            lines.append(f"  {i}. {nb.name}{marker}{lock}")
-        lines.append("\n输入序号或笔记名称即可作为 sy-save 的 notebook 参数")
-        return "\n".join(lines)
-```
+**输入：** notebook 参数（序号如 `"2"` / 名称如 `"AI知识体系"` / 空字符串）
+**输出：** notebook_id
+
+映射规则：
+- 空字符串 → 索引 0（默认笔记本）
+- 序号 `"1"` 到 `"N"` → 对应索引 0 到 N-1
+- 名称模糊匹配 → 遍历 notebooks，匹配 name 包含或包含于输入
+- 序号超出范围 / 名称无匹配 → 报错并列出可用笔记本
+
+缓存：启动时拉取一次，sy-save 内部持有映射器实例。
 
 ---
 
-## 自动标签实现
+## 自动标签规则
 
-```python
-import jieba
-import re
+**输入：** Markdown 内容
+**输出：** ≤6 个标签
 
-def generate_tags(content: str, max_tags: int = 6) -> list[str]:
-    """从 Markdown 内容中提取标签。"""
-    if len(content.strip()) < 20:
-        return []
-    
-    # 去掉 Markdown 标题、代码块、链接
-    text = re.sub(r'^#+\s.*$', '', content, flags=re.MULTILINE)
-    text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
-    
-    # 分词 + 过滤停用词和单字
-    words = jieba.lcut(text)
-    stop_words = {'的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '他', '她', '它', '们'}
-    words = [w.strip() for w in words if w.strip() and len(w.strip()) > 1 and w.strip() not in stop_words]
-    
-    # 按词频排序去重
-    freq = {}
-    for w in words:
-        freq[w] = freq.get(w, 0) + 1
-    sorted_words = sorted(freq.items(), key=lambda x: -x[1])
-    
-    tags = [w for w, _ in sorted_words[:max_tags]]
-    return [t[:10] for t in tags]  # 截断长度
-```
+- 使用 jieba 分词，去除停用词和单字
+- 按词频取 top ≤6
+- 内容 < 20 字时不生成
+- 单标签最长 10 字符，超长截断
+- 标签在确认环节展示，用户可干预（增/删/改/全清除）
 
 ---
 
