@@ -22,3 +22,4 @@ build/
 # Project
 config.yaml
 rg.zip
+.claude/sy-content.md

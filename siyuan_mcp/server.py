@@ -17,6 +17,9 @@ from siyuan_mcp.codebase.search import CodebaseSearcher
 from siyuan_mcp.mapper import NotebookMapper
 from siyuan_mcp.tagger import generate_tags
 
+# ── 常量 ──────────────────────────────────────────
+SY_CONTENT_FILE = Path(".claude/sy-content.md")
+
 
 # ── 工具函数 ──────────────────────────────────────
 
@@ -140,14 +143,10 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="sy-last",
-            description="保存最后一条对话内容到思源笔记。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。",
+            description="保存最后一条对话内容到思源笔记。使用前请先将对话内容写入 .claude/sy-content.md。不传 confirmed 时仅返回预览，传 confirmed=true 才实际写入。",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "笔记内容（由 AI 自动填入最后一次对话内容）",
-                    },
                     "notebook": {
                         "type": "string",
                         "description": "可选，笔记本序号或名称。不指定则用默认笔记本（索引0）",
@@ -157,19 +156,15 @@ async def handle_list_tools() -> list[types.Tool]:
                         "description": "确认标记。传 true 时实际写入，false 或省略时仅返回预览（默认 false）",
                     },
                 },
-                "required": ["content"],
+                "required": [],
             },
         ),
         types.Tool(
             name="sy-session",
-            description="保存整个会话内容到思源笔记。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。",
+            description="保存整个会话内容到思源笔记。使用前请先将会话内容写入 .claude/sy-content.md。不传 confirmed 时仅返回预览，传 confirmed=true 才实际写入。",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "笔记内容（由 AI 自动填入整个对话内容）",
-                    },
                     "notebook": {
                         "type": "string",
                         "description": "可选，笔记本序号或名称。不指定则用默认笔记本（索引0）",
@@ -179,7 +174,7 @@ async def handle_list_tools() -> list[types.Tool]:
                         "description": "确认标记。传 true 时实际写入，false 或省略时仅返回预览（默认 false）",
                     },
                 },
-                "required": ["content"],
+                "required": [],
             },
         ),
         types.Tool(
@@ -264,16 +259,34 @@ async def _handle_sy_list(args: dict) -> list[types.TextContent]:
 # ── sy-save ──────────────────────────────────────
 
 async def _handle_sy_save(args: dict) -> list[types.TextContent]:
-    content_raw = args.get("content", "")
-    if not content_raw.strip():
-        return [types.TextContent(type="text", text="❌ 内容不能为空")]
+    content_raw = args.get("content")
+    has_explicit_content = "content" in args
+
+    # 未传 content 时从 .claude/sy-content.md 读取
+    if not has_explicit_content:
+        content_file = SY_CONTENT_FILE
+        if not content_file.exists() or not content_file.is_file():
+            return [types.TextContent(type="text", text="❌ 内容为空，请先将对话内容写入 .claude/sy-content.md")]
+        try:
+            content_raw = content_file.read_text(encoding="utf-8").strip()
+        except Exception as e:
+            return [types.TextContent(type="text", text=f"❌ 读取 .claude/sy-content.md 失败：{e}")]
+        if not content_raw:
+            return [types.TextContent(type="text", text="❌ .claude/sy-content.md 为空，请写入内容后重试")]
+        source_prefix = "对话文件"
+    else:
+        source_prefix = ""
 
     notebook_spec = args.get("notebook", "")
     confirmed = args.get("confirmed", False)
 
     try:
         # 解析内容来源
-        content, source = _resolve_content(content_raw)
+        if source_prefix:
+            content = content_raw
+            source = source_prefix
+        else:
+            content, source = _resolve_content(content_raw)
         if not content.strip():
             return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
