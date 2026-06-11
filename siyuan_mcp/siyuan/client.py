@@ -33,7 +33,7 @@ class SiyuanClient:
         title: str = "",
         path: str = "",
     ) -> CreateDocResponse:
-        """在思源中创建文档。notebook_id 必填（调用 sy-notebooks 获取）。"""
+        """在思源中创建文档。notebook_id 必填（调用 sy-list 获取）。"""
         if not notebook_id:
             raise ValueError("no_notebook")
 
@@ -70,7 +70,7 @@ class SiyuanClient:
         return [SearchNotesResult(**item) for item in raw_results]
 
     async def get_or_create_daily_note(self, notebook_id: str = "") -> str:
-        """获取或创建今日日记。notebook_id 必填（调用 sy-notebooks 获取）。"""
+        """获取或创建今日日记。notebook_id 必填（调用 sy-list 获取）。"""
         if not notebook_id:
             raise ValueError("no_notebook")
         payload: dict[str, Any] = {"notebook": notebook_id}
