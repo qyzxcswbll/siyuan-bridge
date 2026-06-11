@@ -254,6 +254,10 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
         if not content.strip():
             return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
+        # 防止内容太短（< 30 字且无 Markdown 标题）被当作占位指令
+        if len(content.strip()) < 30 and not content.strip().startswith("#"):
+            return [types.TextContent(type="text", text="⚠️ 内容过短，请提供完整的笔记内容或明确标注「last/最后一次」「session/整个会话」")]
+
         # 提取标题
         title = _extract_title(content)
 
@@ -313,7 +317,7 @@ async def _handle_sy_save(args: dict) -> list[types.TextContent]:
             lines.append(f"  {plain_text}...")
             lines.append("  ─────────────────")
             lines.append("")
-            lines.append('确认保存？回复「确认保存」或「sy-save 已确认」来实际写入。')
+            lines.append("确认保存？(y/N)")
             return [types.TextContent(type="text", text="\n".join(lines))]
 
         # 确认模式：实际写入
