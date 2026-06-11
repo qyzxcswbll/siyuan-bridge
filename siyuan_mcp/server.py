@@ -91,6 +91,19 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={"type": "object", "properties": {}},
         ),
         types.Tool(
+            name="sy-list",
+            description="列出指定笔记本下的文档列表。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "notebook": {
+                        "type": "string",
+                        "description": "笔记本序号或名称",
+                    },
+                },
+            },
+        ),
+        types.Tool(
             name="sy-save",
             description="保存文档到思源笔记。",
             inputSchema={
@@ -177,6 +190,7 @@ async def handle_call_tool(
 
     handlers = {
         "sy-notebook": _handle_sy_notebook,
+        "sy-list": _handle_sy_list,
         "sy-save": _handle_sy_save,
         "sy-read": _handle_sy_read,
         "sy-delete": _handle_sy_delete,
@@ -202,6 +216,32 @@ async def _handle_sy_notebook(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 获取笔记本列表失败：{e}")]
+
+
+# ── sy-list ─────────────────────────────────────
+
+async def _handle_sy_list(args: dict) -> list[types.TextContent]:
+    """列出笔记本下的文档列表。"""
+    notebook_spec = args.get("notebook", "")
+    try:
+        notebook_id = _notebook_mapper.resolve(notebook_spec)
+    except ValueError:
+        notebooks = await _siyuan_client.list_notebooks()
+        _notebook_mapper.set_notebooks(notebooks)
+        notebook_id = _notebook_mapper.resolve(notebook_spec)
+
+    try:
+        docs = await _siyuan_client.list_docs(notebook_id)
+        if not docs:
+            return [types.TextContent(type="text", text="📭 该笔记本下没有文档")]
+        lines = ["📄 文档列表：\n"]
+        for d in docs:
+            title = d.get("name", d.get("title", "未命名"))
+            doc_id = d.get("id", "")
+            lines.append(f"- {title}  `{doc_id}`")
+        return [types.TextContent(type="text", text="\n".join(lines))]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"❌ 获取文档列表失败：{e}")]
 
 
 # ── sy-save ──────────────────────────────────────
