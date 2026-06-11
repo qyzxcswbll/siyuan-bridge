@@ -4,14 +4,14 @@
 
 ## 工具
 
-| 工具 | 功能 | 参数 |
-|------|------|------|
-| `sy-notebook` | 列出笔记本 | — |
-| `sy-list` | 列出文档列表 | `notebook` |
-| `sy-save` | 保存文档（直接写入） | `content`, `notebook` |
-| `sy-read` | 读取文档内容 | `id` |
-| `sy-delete` | 删除文档 | `id`, `notebook` |
-| `sy-find` | 统一搜索（思源 + 代码） | `query`, `mode` |
+| 工具 | 功能 | 参数 | 说明 |
+|------|------|------|------|
+| `sy-notebook` | 列出笔记本 | — | 返回所有笔记本的编号和名称，供其他工具引用 |
+| `sy-list` | 列出文档列表 | `notebook`（笔记本序号或名称） | 返回文档标题 + ID，该 ID 用于 `sy-read` / `sy-delete` |
+| `sy-save` | 保存文档（直接写入） | `content`（Markdown 内容，**必填**）<br>`notebook`（可选，默认索引 0） | 自动提取标题、生成唯一路径；返回文档链接 |
+| `sy-read` | 读取文档内容 | `id`（文档 ID，**必填**） | ID 为 `siyuan://blocks/xxx` 中的 xxx，通过 sy-list 获取 |
+| `sy-delete` | 删除文档 | `id`（文档 ID，**必填**）<br>`notebook`（可选） | ID 来源同上；删除前自动解析文档路径 |
+| `sy-find` | 统一搜索 | `query`（关键词，**必填**）<br>`mode`：`normal`（默认）/ `ai` / `code`<br>`limit`（上限，默认 10）<br>`notebook`（限定笔记本，仅 normal/ai）<br>`path`（限定项目，仅 code）<br>`file_type`：`code` / `doc`（仅 code）<br>`context_lines`（上下文行数，仅 code，默认 3） | normal 搜思源全文；ai 语义搜索；code 搜索本地关联代码库 |
 
 ## 快速开始
 
