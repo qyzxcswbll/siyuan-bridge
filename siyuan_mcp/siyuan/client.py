@@ -9,6 +9,7 @@ from siyuan_mcp.siyuan.models import (
     AppendBlockRequest,
     CreateDocRequest,
     CreateDocResponse,
+    NotebookInfo,
     SearchNotesResult,
 )
 
@@ -85,6 +86,12 @@ class SiyuanClient:
         ).model_dump()
         return await self._call_api("/api/block/appendBlock", data)
 
+    async def list_notebooks(self) -> list[NotebookInfo]:
+        """获取笔记本列表。"""
+        resp = await self._call_api("/api/notebook/lsNotebooks", {})
+        raw = resp if isinstance(resp, list) else resp.get("notebooks", [])
+        return [NotebookInfo(**nb) for nb in raw]
+
     async def _call_api(self, path: str, data: dict[str, Any]) -> Any:
         """调用思源 API 并处理错误。"""
         try:
@@ -101,7 +108,10 @@ class SiyuanClient:
         if body.get("code") != 0:
             raise ValueError(f"思源 API 错误：{body.get('msg', '未知错误')}")
 
-        return body.get("data") or {}  # data 可能为 null，回退为空字典
+        data = body.get("data")
+        if data is None:
+            return {}
+        return data
 
     async def close(self):
         await self._client.aclose()

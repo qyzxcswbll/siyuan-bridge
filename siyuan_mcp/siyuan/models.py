@@ -56,3 +56,10 @@ class AppendBlockRequest(BaseModel):
         d["domainType"] = d.pop("domain_type")
         d["parentType"] = d.pop("parent_type")
         return d
+
+
+class NotebookInfo(BaseModel):
+    """笔记本信息（从 lsNotebooks 响应解析）。"""
+    id: str
+    name: str
+    closed: bool = False

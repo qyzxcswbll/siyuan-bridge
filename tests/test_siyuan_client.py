@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 from siyuan_mcp.siyuan.models import (
     CreateDocRequest,
     CreateDocResponse,
+    NotebookInfo,
     SearchNotesRequest,
     SearchNotesResult,
 )
@@ -180,3 +181,50 @@ async def test_append_block_camelcase_serialization(config):
     assert "parent_id" not in dumped
     assert dumped["parentID"] == "pid"
     assert dumped["domainType"] == 0
+
+
+# ── 笔记本列表测试 ─────────────────────────────
+
+@pytest.mark.asyncio
+async def test_list_notebooks_success(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0,
+        "msg": "",
+        "data": {
+            "notebooks": [
+                {"id": "nb-1", "name": "AI知识体系", "closed": False},
+                {"id": "nb-2", "name": "日记本", "closed": False},
+                {"id": "nb-3", "name": "归档", "closed": True},
+            ]
+        },
+    }
+
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+
+        result = await client.list_notebooks()
+        assert len(result) == 3
+        assert result[0].name == "AI知识体系"
+        assert result[0].id == "nb-1"
+        assert result[2].closed is True
+
+
+@pytest.mark.asyncio
+async def test_list_notebooks_empty(config):
+    client = SiyuanClient(config)
+    mock_response = {
+        "code": 0,
+        "msg": "",
+        "data": {"notebooks": []},
+    }
+
+    with patch.object(client._client, "post") as mock_post:
+        mock_post.return_value = AsyncMock()
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = lambda: mock_response
+
+        result = await client.list_notebooks()
+        assert result == []
