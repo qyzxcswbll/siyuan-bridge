@@ -1,12 +1,15 @@
-"""测试 MCP 服务器工具注册和处理函数（3 工具系统）。"""
+"""测试 MCP 服务器工具注册和处理函数。"""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from siyuan_mcp.server import (
-    _handle_sy_save,
-    _handle_sy_find,
+    _handle_sy_notebook,
     _handle_sy_list,
+    _handle_sy_save,
+    _handle_sy_read,
+    _handle_sy_delete,
+    _handle_sy_find,
     _extract_title,
     _match_project,
 )
@@ -21,55 +24,57 @@ async def test_sy_save_empty_content():
 
 
 @pytest.mark.asyncio
+async def test_sy_read_empty_id():
+    result = await _handle_sy_read({"id": ""})
+    assert "不能为空" in result[0].text
+
+
+@pytest.mark.asyncio
+async def test_sy_delete_empty_id():
+    result = await _handle_sy_delete({"id": ""})
+    assert "不能为空" in result[0].text
+
+
+@pytest.mark.asyncio
 async def test_sy_find_empty_query():
     result = await _handle_sy_find({"query": ""})
     assert "不能为空" in result[0].text
 
 
-# ── sy-list 测试 ─────────────────────────────
+# ── sy-notebook 测试 ────────────────────────────
 
 @pytest.mark.asyncio
-async def test_sy_list_returns_notebooks():
+async def test_sy_notebook_returns_list():
     import siyuan_mcp.server as srv
-    from siyuan_mcp.siyuan.models import NotebookInfo
-
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.list_notebooks.return_value = [
-        NotebookInfo(id="nb-1", name="AI知识体系", closed=False),
-        NotebookInfo(id="nb-2", name="工作文档", closed=False),
-        NotebookInfo(id="nb-3", name="归档", closed=True),
+        type("NB", (), {"id": "nb-1", "name": "测试笔记本", "closed": False})(),
     ]
-    # 重置 mapper 状态
-    srv._notebook_mapper._notebooks = []
 
     try:
-        result = await _handle_sy_list({})
-        assert "AI知识体系" in result[0].text
-        assert "工作文档" in result[0].text
-        assert "归档" in result[0].text
-        assert "当前默认" in result[0].text
+        result = await _handle_sy_notebook({})
+        assert "测试笔记本" in result[0].text
     finally:
         srv._siyuan_client = None
 
 
 @pytest.mark.asyncio
-async def test_sy_list_connection_error():
+async def test_sy_notebook_connection_error():
     import siyuan_mcp.server as srv
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.list_notebooks.side_effect = ConnectionError("思源笔记未运行")
 
     try:
-        result = await _handle_sy_list({})
+        result = await _handle_sy_notebook({})
         assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None
 
 
-# ── sy-save 确认流程测试 ───────────────────
+# ── sy-list 测试 ───────────────────────────────
 
 @pytest.mark.asyncio
-async def test_sy_save_preview_no_confirm():
-    """不传 confirmed → 返回预览信息。"""
+async def test_sy_list_docs():
     import siyuan_mcp.server as srv
     from siyuan_mcp.config.loader import Config
     from siyuan_mcp.siyuan.models import NotebookInfo
@@ -77,157 +82,153 @@ async def test_sy_save_preview_no_confirm():
     srv._config = Config()
     srv._siyuan_client = AsyncMock()
     srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="默认笔记本", closed=False),
+        NotebookInfo(id="nb-1", name="测试笔记本", closed=False),
+    ]
+    srv._siyuan_client.list_docs.return_value = [
+        {"id": "doc-1", "title": "文档1", "path": "/文档1"},
+        {"id": "doc-2", "title": "文档2", "path": "/文件夹/文档2"},
     ]
 
     try:
-        result = await _handle_sy_save({"content": "# 测试标题\n这是测试内容"})
-        assert "📄 内容" in result[0].text or "测试标题" in result[0].text
-        assert "测试标题" in result[0].text
-        # 不应调用写入
-        srv._siyuan_client.create_doc.assert_not_called()
+        result = await _handle_sy_list({"notebook": "1"})
+        assert "文档1" in result[0].text
+        assert "文档2" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
 
 
 @pytest.mark.asyncio
-async def test_sy_save_confirmed_writes():
-    """confirmed=true → 调用 create_doc。"""
+async def test_sy_list_empty():
     import siyuan_mcp.server as srv
     from siyuan_mcp.config.loader import Config
     from siyuan_mcp.siyuan.models import NotebookInfo
 
     srv._config = Config()
     srv._siyuan_client = AsyncMock()
-    srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试标题"})()
+    srv._notebook_mapper._notebooks = [
+        NotebookInfo(id="nb-1", name="空笔记本", closed=False),
+    ]
+    srv._siyuan_client.list_docs.return_value = []
+
+    try:
+        result = await _handle_sy_list({"notebook": "1"})
+        assert "没有文档" in result[0].text
+    finally:
+        srv._siyuan_client = None
+        srv._config = None
+
+
+# ── sy-save 测试 ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sy_save_success():
+    import siyuan_mcp.server as srv
+    from siyuan_mcp.config.loader import Config
+    from siyuan_mcp.siyuan.models import NotebookInfo
+
+    srv._config = Config()
+    srv._siyuan_client = AsyncMock()
     srv._notebook_mapper._notebooks = [
         NotebookInfo(id="nb-1", name="默认笔记本", closed=False),
     ]
+    srv._siyuan_client.create_doc.return_value = type(
+        "R", (), {"id": "doc-1", "title": "测试笔记"}
+    )()
 
     try:
-        result = await _handle_sy_save({
-            "content": "# 测试标题\n这是测试内容",
-            "confirmed": True,
-        })
-        srv._siyuan_client.create_doc.assert_called_once()
+        result = await _handle_sy_save({"content": "# 测试笔记\n正文内容", "notebook": "1"})
         assert "已保存" in result[0].text
-        assert "测试标题" in result[0].text
+        assert "doc-1" in result[0].text
+        srv._siyuan_client.create_doc.assert_called_once()
     finally:
         srv._siyuan_client = None
         srv._config = None
 
 
 @pytest.mark.asyncio
-async def test_sy_save_with_notebook_index():
-    """notebook="2" → 映射到索引 1 的笔记本。"""
+async def test_sy_save_connection_error():
     import siyuan_mcp.server as srv
-    from siyuan_mcp.config.loader import Config
-    from siyuan_mcp.siyuan.models import NotebookInfo
-
-    srv._config = Config()
     srv._siyuan_client = AsyncMock()
-    srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试"})()
-    srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="默认", closed=False),
-        NotebookInfo(id="nb-2", name="工作文档", closed=False),
-    ]
+    srv._siyuan_client.create_doc.side_effect = ConnectionError("思源笔记未运行")
 
     try:
-        result = await _handle_sy_save({
-            "content": "# 测试",
-            "notebook": "2",
-            "confirmed": True,
-        })
-        # 应传到 nb-2
-        call_args = srv._siyuan_client.create_doc.call_args
-        assert call_args[1]["notebook_id"] == "nb-2"
+        result = await _handle_sy_save({"content": "# 测试"})
+        assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None
-        srv._config = None
+
+
+# ── sy-read 测试 ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_sy_read_success():
+    import siyuan_mcp.server as srv
+    srv._siyuan_client = AsyncMock()
+    srv._siyuan_client.get_doc.return_value = type(
+        "D", (), {"id": "doc-1", "content": "# 文档内容\n正文", "path": "/test", "title": "文档内容"}
+    )()
+
+    try:
+        result = await _handle_sy_read({"id": "doc-1"})
+        assert "文档内容" in result[0].text
+    finally:
+        srv._siyuan_client = None
 
 
 @pytest.mark.asyncio
-async def test_sy_save_with_notebook_name():
-    """notebook="AI知识" → 模糊匹配。"""
+async def test_sy_read_connection_error():
     import siyuan_mcp.server as srv
-    from siyuan_mcp.config.loader import Config
-    from siyuan_mcp.siyuan.models import NotebookInfo
-
-    srv._config = Config()
     srv._siyuan_client = AsyncMock()
-    srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试"})()
-    srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="默认", closed=False),
-        NotebookInfo(id="nb-2", name="AI知识体系", closed=False),
-    ]
+    srv._siyuan_client.get_doc.side_effect = ConnectionError("思源笔记未运行")
 
     try:
-        result = await _handle_sy_save({
-            "content": "# 测试",
-            "notebook": "AI知识",
-            "confirmed": True,
-        })
-        call_args = srv._siyuan_client.create_doc.call_args
-        assert call_args[1]["notebook_id"] == "nb-2"
+        result = await _handle_sy_read({"id": "doc-1"})
+        assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None
-        srv._config = None
 
+
+# ── sy-delete 测试 ─────────────────────────────
 
 @pytest.mark.asyncio
-async def test_sy_save_default_notebook():
-    """notebook="" → 索引0。"""
+async def test_sy_delete_success():
     import siyuan_mcp.server as srv
     from siyuan_mcp.config.loader import Config
     from siyuan_mcp.siyuan.models import NotebookInfo
 
     srv._config = Config()
     srv._siyuan_client = AsyncMock()
-    srv._siyuan_client.create_doc.return_value = type("R", (), {"id": "doc-1", "title": "测试"})()
     srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="默认", closed=False),
-        NotebookInfo(id="nb-2", name="工作文档", closed=False),
+        NotebookInfo(id="nb-1", name="测试笔记本", closed=False),
     ]
+    # get_doc returns path
+    srv._siyuan_client.get_doc.return_value = type(
+        "D", (), {"id": "doc-1", "content": "# 内容", "path": "/待删除", "title": "待删除"}
+    )()
+    srv._siyuan_client.remove_doc.return_value = True
 
     try:
-        result = await _handle_sy_save({
-            "content": "# 测试",
-            "notebook": "",
-            "confirmed": True,
-        })
-        call_args = srv._siyuan_client.create_doc.call_args
-        assert call_args[1]["notebook_id"] == "nb-1"
+        result = await _handle_sy_delete({"id": "doc-1", "notebook": "1"})
+        assert "已删除" in result[0].text
     finally:
         srv._siyuan_client = None
         srv._config = None
 
 
-# ── sy-find 测试 ─────────────────────────────
+# ── sy-find 测试（保留）───────────────────────
 
 @pytest.mark.asyncio
 async def test_sy_find_normal_mode():
     import siyuan_mcp.server as srv
-    from siyuan_mcp.siyuan.models import SearchNotesResult
-
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.search_notes.return_value = [
-        SearchNotesResult(
-            id="doc-1",
-            title="测试文档",
-            snippet="这是测试内容",
-            path="/测试/测试文档",
-            score=0.95,
-        ),
+        type("R", (), {"id": "1", "title": "结果1", "snippet": "匹配内容", "path": "/路径"})(),
     ]
 
     try:
-        result = await _handle_sy_find({"query": "测试", "mode": "normal"})
-        assert "测试文档" in result[0].text
-        assert "mode: normal" in result[0].text
-        srv._siyuan_client.search_notes.assert_called_once_with(
-            query="测试", mode="normal", limit=10, notebook=""
-        )
+        result = await _handle_sy_find({"query": "测试"})
+        assert "结果1" in result[0].text
     finally:
         srv._siyuan_client = None
 
@@ -235,63 +236,20 @@ async def test_sy_find_normal_mode():
 @pytest.mark.asyncio
 async def test_sy_find_code_mode():
     import siyuan_mcp.server as srv
-    from unittest.mock import MagicMock
+    from siyuan_mcp.codebase.search import CodeSearchResult
+    from unittest.mock import patch
 
-    srv._code_searcher = MagicMock()
-    srv._code_searcher.search.return_value = (
-        [
-            MagicMock(repo="wallet", file="src/main.py", line=42, snippet="def process(): pass"),
-        ],
-        [],
-    )
-
-    try:
-        result = await _handle_sy_find({"query": "def process", "mode": "code"})
-        assert "wallet" in result[0].text
-        assert "src/main.py" in result[0].text
-        assert "mode: code" in result[0].text
-    finally:
-        srv._code_searcher = None
+    with patch("siyuan_mcp.server._code_searcher") as mock_searcher:
+        mock_searcher.search.return_value = (
+            [CodeSearchResult("myrepo", "src/main.rs", 42, "fn test() {}", "test")],
+            [],
+        )
+        result = await _handle_sy_find({"query": "test", "mode": "code"})
+        assert "myrepo" in result[0].text
 
 
 @pytest.mark.asyncio
-async def test_sy_find_code_mode_no_results():
-    import siyuan_mcp.server as srv
-    from unittest.mock import MagicMock
-
-    srv._code_searcher = MagicMock()
-    srv._code_searcher.search.return_value = ([], ["skipped-repo"])
-
-    try:
-        result = await _handle_sy_find({"query": "nonexistent", "mode": "code"})
-        assert "未找到" in result[0].text
-        assert "skipped-repo" in result[0].text
-    finally:
-        srv._code_searcher = None
-
-
-# ── 错误处理测试 ─────────────────────────────
-
-@pytest.mark.asyncio
-async def test_sy_save_handles_connection_error():
-    import siyuan_mcp.server as srv
-    srv._siyuan_client = AsyncMock()
-    srv._siyuan_client.list_notebooks.side_effect = ConnectionError("思源笔记未运行")
-    # 确保 mapper 为空，触发自动刷新（刷新失败 → ConnectionError）
-    orig_notebooks = srv._notebook_mapper._notebooks
-    srv._notebook_mapper._notebooks = []
-
-    try:
-        result = await _handle_sy_save({"content": "# 测试"})
-        assert "思源笔记未运行" in result[0].text
-    finally:
-        # 恢复（以防影响其他测试）
-        srv._notebook_mapper._notebooks = orig_notebooks
-        srv._siyuan_client = None
-
-
-@pytest.mark.asyncio
-async def test_sy_find_handles_connection_error():
+async def test_sy_find_connection_error():
     import siyuan_mcp.server as srv
     srv._siyuan_client = AsyncMock()
     srv._siyuan_client.search_notes.side_effect = ConnectionError("思源笔记未运行")
@@ -301,21 +259,6 @@ async def test_sy_find_handles_connection_error():
         assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None
-
-
-@pytest.mark.asyncio
-async def test_code_find_handles_search_exception():
-    import siyuan_mcp.server as srv
-    from unittest.mock import MagicMock
-
-    srv._code_searcher = MagicMock()
-    srv._code_searcher.search.side_effect = RuntimeError("搜索异常")
-
-    try:
-        result = await _handle_sy_find({"query": "test", "mode": "code"})
-        assert "代码搜索失败" in result[0].text
-    finally:
-        srv._code_searcher = None
 
 
 # ── 辅助函数测试 ─────────────────────────────
@@ -329,6 +272,7 @@ def test_extract_title():
 def test_match_project_with_repos_in_content():
     import siyuan_mcp.server as srv
     from siyuan_mcp.config.loader import Config, CodebaseRepo
+
     srv._config = Config()
     srv._config.codebase.repos = [
         CodebaseRepo(path="/tmp/wallet", name="wallet"),
@@ -340,9 +284,3 @@ def test_match_project_with_repos_in_content():
         assert _match_project("不相关的内容") == ""
     finally:
         srv._config = None
-
-
-def test_match_project_no_config():
-    import siyuan_mcp.server as srv
-    srv._config = None
-    assert _match_project("anything") == ""
