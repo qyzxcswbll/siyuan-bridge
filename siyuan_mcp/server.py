@@ -1,11 +1,9 @@
 """MCP 服务主文件。声明所有工具，启动服务。"""
 
-import os
 import re
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 import mcp.server.stdio
 import mcp.types as types
