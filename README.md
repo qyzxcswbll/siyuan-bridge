@@ -1,15 +1,17 @@
 # siyuan-mcp
 
-连接 **Claude** 与 **[思源笔记](https://github.com/siyuan-note/siyuan)** 的 MCP 服务。让你在终端中通过自然语言管理知识库，无需打开思源笔记。
+连接 **Claude** 与 **[思源笔记](https://github.com/siyuan-note/siyuan)** 的 MCP 服务。通过低层级、确定性的工具管理知识库。
 
-## 功能
+## 工具
 
-| 工具 | 说明 | 分类 |
+| 工具 | 功能 | 参数 |
 |------|------|------|
-| `sy-save` | 保存笔记到收集箱，指定 name/notebook 保存到项目目录 | 笔记保存 |
-| `sy-auto` | 自动分类保存到项目目录 | 笔记保存 |
-| `sy-find` | 搜索思源知识库（关键词 / AI 语义） | 知识检索 |
-| `code-find` | 在关联的本地 Git 项目中搜索代码 | 代码检索 |
+| `sy-notebook` | 列出笔记本 | — |
+| `sy-list` | 列出文档列表 | `notebook` |
+| `sy-save` | 保存文档（直接写入） | `content`, `notebook` |
+| `sy-read` | 读取文档内容 | `id` |
+| `sy-delete` | 删除文档 | `id`, `notebook` |
+| `sy-find` | 统一搜索（思源 + 代码） | `query`, `mode` |
 
 ## 快速开始
 
@@ -17,23 +19,16 @@
 
 - **Python 3.10+**
 - **思源笔记 v3.6.5+**（运行中，开启网络伺服）
-- **ripgrep**（可选，用于 `code-find`）
+- **ripgrep**（可选，用于 `sy-find mode=code`）
   ```bash
-  # Windows
-  winget install BurntSushi.ripgrep
-  # macOS
-  brew install ripgrep
-  # Linux
-  apt install ripgrep
+  winget install BurntSushi.ripgrep   # Windows
+  brew install ripgrep                # macOS
+  apt install ripgrep                 # Linux
   ```
 
 ### 安装
 
 ```bash
-# 方式一：从 PyPI 安装（推荐）
-pip install siyuan-mcp
-
-# 方式二：从源码安装
 git clone https://github.com/your/siyuan-mcp.git
 cd siyuan-mcp
 pip install -e .
@@ -42,14 +37,11 @@ pip install -e .
 ### 配置
 
 ```bash
-# 复制并编辑配置
 cp config.yaml.example config.yaml
-# 按需修改——至少配置 codebase.repos 的代码库路径
+# 配置思源 API Token
 ```
 
-### 注册到 Claude Code
-
-在 `claude.json` 中添加：
+### 注册到 Claude
 
 ```json
 {
@@ -62,97 +54,37 @@ cp config.yaml.example config.yaml
 }
 ```
 
-或者通过 PyPI 安装后使用 `uvx`（推荐）：
-
-```json
-{
-  "mcpServers": {
-    "siyuan-mcp": {
-      "command": "uvx",
-      "args": ["siyuan-mcp"]
-    }
-  }
-}
-```
-
-> **注意**：使用 `pip install siyuan-mcp` 后，`uvx siyuan-mcp` 会自动运行已安装的包。
-
 ## 使用示例
 
 ```
-> 帮我把这段内容保存到思源：JWT 认证的实现思路是...
-→ sy-save: ✅ 已保存到思源
-
-> 查一下我关于 OAuth2 的笔记
-→ sy-find: 🔍 找到 3 条结果
-
-> 在钱包项目中搜索 Transfer 函数
-→ code-find: 🔍 找到 5 处代码匹配
+sy-notebook                    → 列出所有笔记本
+sy-list 临时使用               → 列出笔记本下的文档（含 ID）
+sy-save 把这段内容保存到思源    → 直接写入文档
+sy-read siyuan://blocks/xxx    → 读取文档内容（含标题）
+sy-delete siyuan://blocks/xxx  → 删除文档
+sy-find OAuth2                 → 搜索知识库
+sy-find fn main mode=code      → 搜索本地代码
 ```
 
-## 配置项说明
+## 配置项
 
-所有配置项都有合理的默认值，开箱即用。配置加载优先级：
+| 配置项 | 说明 |
+|--------|------|
+| `siyuan.host` | 思源 API 地址（默认 127.0.0.1） |
+| `siyuan.port` | 思源 API 端口（默认 6806） |
+| `siyuan.token` | API Token |
+| `codebase.repos` | 关联代码库列表 |
+| `search.max_results` | 搜索结果上限 |
+| `search.rg_path` | ripgrep 路径 |
 
-1. `./config.yaml`（当前目录）
-2. `~/.siyuan-mcp/config.yaml`（用户目录）
-3. 内置默认值
-4. 环境变量（最高优先级）
-
-### 思源连接
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `siyuan.host` | string | `127.0.0.1` | 思源 API 地址 |
-| `siyuan.port` | int | `6806` | 思源 API 端口 |
-| `siyuan.token` | string | `""` | API Token（[获取方式](https://github.com/siyuan-note/siyuan)） |
-| `siyuan.workspace` | string | `""` | 工作空间路径（自动检测） |
-
-### 代码库
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `codebase.repos` | array | `[]` | 关联代码库列表 |
-| `codebase.repos[].path` | string | — | 本地路径 |
-| `codebase.repos[].name` | string | — | 别名（code-find 的 path 参数匹配此项） |
-
-### 搜索
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `search.default_mode` | enum | `normal` | 默认搜索模式：`normal`或`ai` |
-| `search.max_results` | int | `10` | 搜索结果数量上限 |
-| `search.rg_path` | string | `rg` | ripgrep 命令路径 |
-
-### 存储
-
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `storage.default_notebook` | string | `""` | 默认笔记本 ID（空=思源默认） |
-| `storage.inbox_path` | string | `"/"` | 收集箱路径 |
-
-### 环境变量覆盖
-
-所有配置项均可通过 `{SECTION}_{KEY}` 格式的环境变量覆盖：
-
-```bash
-export SIYUAN_HOST="192.168.1.100"
-export SIYUAN_TOKEN="your-token-here"
-export CODEBASE_REPOS='[{"path": "/projects/wallet", "name": "wallet"}]'
-export SEARCH_MAX_RESULTS=20
-```
+环境变量：`SIYUAN_HOST` `SIYUAN_PORT` `SIYUAN_TOKEN` `CODEBASE_REPOS` `SEARCH_MAX_RESULTS`
 
 ## 开发
 
 ```bash
-# 安装开发依赖
 pip install -e ".[dev]"
-
-# 运行测试
-pytest -v
-
-# 代码检查
-ruff check siyuan_mcp/
+pytest -v      # 60 个测试
+python -m siyuan_mcp
 ```
 
 ## 项目结构
@@ -160,23 +92,30 @@ ruff check siyuan_mcp/
 ```
 siyuan-mcp/
 ├── siyuan_mcp/
-│   ├── server.py          # MCP 服务主文件（工具注册+分发）
-│   ├── siyuan/            # 思源 API 客户端
-│   │   ├── client.py      # HTTP API 封装
-│   │   └── models.py      # 数据模型
-│   ├── codebase/          # 代码库搜索
-│   │   └── search.py      # ripgrep 封装
-│   └── config/            # 配置系统
-│       ├── loader.py      # YAML 加载+合并+校验
-│       └── defaults.py    # 内置默认值
-├── tests/
-│   ├── test_config_loader.py
-│   ├── test_siyuan_client.py
-│   ├── test_codebase_search.py
-│   └── test_server.py
+│   ├── server.py            # 6 工具注册 + 分发
+│   ├── mapper.py            # 笔记本序号/名称映射
+│   ├── tagger.py            # jieba 自动标签
+│   ├── siyuan/
+│   │   ├── client.py        # 思源 HTTP API
+│   │   └── models.py        # 数据模型
+│   ├── codebase/
+│   │   └── search.py        # ripgrep 搜索
+│   └── config/
+│       ├── defaults.py
+│       └── loader.py
+├── tests/                   # 6 个测试文件
+├── pyproject.toml
 ├── config.yaml.example
-└── pyproject.toml
+└── .mcp.json
 ```
+
+## 设计原则
+
+参考 [obsidian-mcp](https://github.com/newtype-01/obsidian-mcp) 的低层级设计哲学：
+
+> 每个工具只做一件事，不做猜测。
+
+AI 负责内容生成，MCP 负责内容存储。工具不承诺"智能"行为。
 
 ## 许可证
 
