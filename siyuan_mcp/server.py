@@ -15,6 +15,8 @@ from mcp.server.models import InitializationOptions
 from siyuan_mcp.config.loader import ConfigLoader
 from siyuan_mcp.siyuan.client import SiyuanClient
 from siyuan_mcp.codebase.search import CodebaseSearcher
+from siyuan_mcp.mapper import NotebookMapper
+from siyuan_mcp.tagger import generate_tags
 
 
 # ── 工具函数 ──────────────────────────────────────
@@ -54,247 +56,6 @@ def _format_doc_result(result, action: str, location: str = "") -> str:
         lines.append(f"- 链接：siyuan://blocks/{result.id}")
     return "\n".join(lines)
 
-# ── 全局状态 ──────────────────────────────────────
-_config = None
-_siyuan_client = None
-_code_searcher = None
-
-server = Server("siyuan-mcp")
-
-
-def _ensure_initialized():
-    """懒初始化全局依赖（在工具首次调用时）。"""
-    global _config, _siyuan_client, _code_searcher
-    if _config is None:
-        loader = ConfigLoader()
-        _config = loader.load()
-        _siyuan_client = SiyuanClient(_config)
-        _code_searcher = CodebaseSearcher(_config)
-
-
-# ── 工具列表声明 ────────────────────────────────
-
-@server.list_tools()
-async def handle_list_tools() -> list[types.Tool]:
-    return [
-        types.Tool(
-            name="sy-notebooks",
-            description="列出思源笔记中所有可用的笔记本。保存笔记前先调用此工具让用户选择保存位置。",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
-        ),
-        types.Tool(
-            name="sy-save",
-            description="保存笔记到思源。name 为空时保存到收集箱，name 有值时保存到对应项目目录。",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "笔记内容（Markdown 格式）",
-                    },
-                    "notebook": {
-                        "type": "string",
-                        "description": "可选，笔记本 ID（调用 sy-notebooks 获取）。不指定则用默认笔记本",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "可选，项目名称，有值时保存到 /projects/{name}/ 目录",
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "可选，标签列表",
-                    },
-                    "source": {
-                        "type": "string",
-                        "description": "可选，来源标记（如 claude-chat）",
-                    },
-                },
-                "required": ["content"],
-            },
-        ),
-        types.Tool(
-            name="sy-auto",
-            description="自动分类保存笔记。根据项目名称（匹配 codebase.repos）和内容标题自动归类到思源项目目录。",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "笔记内容（Markdown 格式）",
-                    },
-                    "notebook": {
-                        "type": "string",
-                        "description": "可选，笔记本 ID。不指定则用默认笔记本",
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "可选，标签列表",
-                    },
-                },
-                "required": ["content"],
-            },
-        ),
-        types.Tool(
-            name="sy-find",
-            description="搜索思源笔记知识库。支持普通关键词搜索和 AI 语义搜索两种模式。",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词",
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["normal", "ai"],
-                        "description": "搜索模式：normal（关键词匹配）或 ai（语义搜索）",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "最大返回结果数（默认 10）",
-                    },
-                    "notebook": {
-                        "type": "string",
-                        "description": "可选，限定笔记本",
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        types.Tool(
-            name="code-find",
-            description="在关联的本地 Git 项目中搜索代码。支持正则表达式，可限定项目范围。",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词（支持正则表达式）",
-                    },
-                    "path": {
-                        "type": "string",
-                        "description": "可选，限定在特定项目中搜索（匹配 repo name）",
-                    },
-                    "file_type": {
-                        "type": "string",
-                        "enum": ["code", "doc"],
-                        "description": "文件类型过滤：code（排除文档）或 doc（仅文档）",
-                    },
-                    "context_lines": {
-                        "type": "integer",
-                        "description": "匹配行上下文的行数（默认 3）",
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-    ]
-
-
-# ── 工具调用分发 ──────────────────────────────
-
-@server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
-) -> list[types.TextContent]:
-    _ensure_initialized()
-
-    handlers = {
-        "sy-notebooks": _handle_sy_notebooks,
-        "sy-save": _handle_sy_save,
-        "sy-auto": _handle_sy_auto,
-        "sy-find": _handle_sy_find,
-        "code-find": _handle_code_find,
-    }
-
-    handler = handlers.get(name)
-    if not handler:
-        raise ValueError(f"未知工具：{name}")
-
-    return await handler(arguments or {})
-
-
-# ── sy-notebooks ─────────────────────────────────
-
-async def _handle_sy_notebooks(args: dict) -> list[types.TextContent]:
-    """列出所有笔记本。"""
-    _ensure_initialized()
-    try:
-        import httpx
-        siyuan_cfg = _config.siyuan
-        headers = {"Content-Type": "application/json"}
-        if siyuan_cfg.token:
-            headers["Authorization"] = f"Token {siyuan_cfg.token}"
-        async with httpx.AsyncClient(
-            base_url=f"http://{siyuan_cfg.host}:{siyuan_cfg.port}",
-            headers=headers,
-            timeout=15.0,
-        ) as c:
-            r = await c.post("/api/notebook/lsNotebooks", json={})
-            body = r.json()
-            if body.get("code") != 0:
-                return [types.TextContent(type="text", text=f"获取笔记本列表失败：{body.get('msg')}")]
-            notebooks = body["data"]["notebooks"]
-            lines = ["📚 可用的笔记本：\n"]
-            for nb in notebooks:
-                lines.append(f"- `{nb['id']}` — **{nb['name']}**")
-                if nb.get("closed"):
-                    lines[-1] += " 🔒"
-            return [types.TextContent(type="text", text="\n".join(lines))]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"获取笔记本列表失败：{e}")]
-
-
-# ── sy-save ──────────────────────────────────────
-
-async def _handle_sy_save(args: dict) -> list[types.TextContent]:
-    content = args.get("content", "")
-    if not content.strip():
-        return [types.TextContent(type="text", text="❌ 内容不能为空")]
-
-    try:
-        tags = args.get("tags")
-        name = args.get("name", "")
-        notebook = args.get("notebook", "")
-
-        if tags:
-            content += "\n\n---\n标签：" + "、".join(tags)
-
-        path = _make_doc_path(content, name=name)
-        title = _extract_title(content)
-        result = await _siyuan_client.create_doc(
-            markdown=content,
-            path=path,
-            notebook_id=notebook,
-        )
-
-        location = f"项目 [{name}]" if name else "收集箱"
-        result_text = (
-            f"✅ 已保存到思源（{location}）\n"
-            f"- 标题：{title}\n"
-        )
-        if result.id:
-            result_text += f"- 链接：siyuan://blocks/{result.id}"
-        return [types.TextContent(type="text", text=result_text)]
-    except ConnectionError as e:
-        return [types.TextContent(type="text", text=f"❌ {e}")]
-    except ValueError as e:
-        if str(e) == "no_notebook":
-            return await _handle_sy_notebooks({})
-        return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
-
-
-
-
-# ── sy-auto ─────────────────────────────────────
 
 def _extract_title(markdown: str) -> str:
     """从 Markdown 内容中提取第一个标题。"""
@@ -309,10 +70,11 @@ def _extract_title(markdown: str) -> str:
 
 def _match_project(content: str) -> str:
     """尝试从 content 和 codebase repos 中匹配项目名称。"""
+    if _config is None:
+        return ""
     repos = _config.codebase.repos
     if not repos:
         return ""
-    # 从内容中检查是否提到某个项目名
     title = _extract_title(content).lower()
     for repo in repos:
         if repo.name.lower() in title or repo.name.lower() in content.lower():
@@ -344,52 +106,245 @@ def _resolve_content(raw: str) -> tuple[str, str]:
     return raw, "笔记"
 
 
-async def _handle_sy_auto(args: dict) -> list[types.TextContent]:
+# ── 全局状态 ──────────────────────────────────────
+_config = None
+_siyuan_client = None
+_code_searcher = None
+_notebook_mapper = NotebookMapper()
+
+server = Server("siyuan-mcp")
+
+
+def _ensure_initialized():
+    """懒初始化全局依赖（在工具首次调用时）。"""
+    global _config, _siyuan_client, _code_searcher
+    if _config is None:
+        loader = ConfigLoader()
+        _config = loader.load()
+        _siyuan_client = SiyuanClient(_config)
+        _code_searcher = CodebaseSearcher(_config)
+
+
+# ── 工具列表声明 ────────────────────────────────
+
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="sy-list",
+            description="列出思源笔记中所有笔记本（带编号和名称）。用户可通过序号或名称选择笔记本。",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        types.Tool(
+            name="sy-save",
+            description="保存笔记到思源。不传 confirmed 时仅返回预览确认信息，传 confirmed=true 才实际写入。内容以 @ 开头可自动读取文件。默认 notebook 为空时保存到索引0（第一个笔记本）。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "笔记内容（Markdown 格式）或以 @ 开头的文件路径",
+                    },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，笔记本序号或名称。不指定则用默认笔记本（索引0）",
+                    },
+                    "confirmed": {
+                        "type": "boolean",
+                        "description": "确认标记。传 true 时实际写入，false 或省略时仅返回预览（默认 false）",
+                    },
+                },
+                "required": ["content"],
+            },
+        ),
+        types.Tool(
+            name="sy-find",
+            description="统一搜索。mode=normal|ai 搜索思源知识库，mode=code 搜索本地代码库。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "搜索关键词",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["normal", "ai", "code"],
+                        "description": "搜索模式：normal（默认）/ ai（语义搜索）/ code（代码搜索）",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "搜索结果数量上限（默认 10）",
+                    },
+                    "notebook": {
+                        "type": "string",
+                        "description": "可选，限定笔记本（仅 normal/ai 模式）",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "可选，限定项目名（仅 code 模式，匹配 repo name）",
+                    },
+                    "file_type": {
+                        "type": "string",
+                        "enum": ["code", "doc"],
+                        "description": "文件类型过滤（仅 code 模式）",
+                    },
+                    "context_lines": {
+                        "type": "integer",
+                        "description": "上下文行数（仅 code 模式，默认 3）",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+    ]
+
+
+# ── 工具调用分发 ──────────────────────────────
+
+@server.call_tool()
+async def handle_call_tool(
+    name: str, arguments: dict | None
+) -> list[types.TextContent]:
+    _ensure_initialized()
+
+    handlers = {
+        "sy-list": _handle_sy_list,
+        "sy-save": _handle_sy_save,
+        "sy-find": _handle_sy_find,
+    }
+
+    handler = handlers.get(name)
+    if not handler:
+        raise ValueError(f"未知工具：{name}")
+
+    return await handler(arguments or {})
+
+
+# ── sy-list ─────────────────────────────────────
+
+async def _handle_sy_list(args: dict) -> list[types.TextContent]:
+    """列出笔记本（带编号和名称）。"""
+    try:
+        notebooks = await _siyuan_client.list_notebooks()
+        _notebook_mapper.set_notebooks(notebooks)
+        return [types.TextContent(type="text", text=_notebook_mapper.format_list())]
+    except ConnectionError as e:
+        return [types.TextContent(type="text", text=f"❌ {e}")]
+    except Exception as e:
+        return [types.TextContent(type="text", text=f"❌ 获取笔记本列表失败：{e}")]
+
+
+# ── sy-save ──────────────────────────────────────
+
+async def _handle_sy_save(args: dict) -> list[types.TextContent]:
     content_raw = args.get("content", "")
     if not content_raw.strip():
         return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
+    notebook_spec = args.get("notebook", "")
+    confirmed = args.get("confirmed", False)
+
     try:
+        # 解析内容来源
         content, source = _resolve_content(content_raw)
         if not content.strip():
             return [types.TextContent(type="text", text="❌ 内容不能为空")]
 
-        tags = args.get("tags")
-        notebook = args.get("notebook", "")
-        if tags:
-            content += "\n\n---\n标签：" + "、".join(tags)
-
-        name = _match_project(content)
-        if not name:
-            name = "uncategorized"
-
-        path = _make_doc_path(content, name=name)
+        # 提取标题
         title = _extract_title(content)
+
+        # 匹配项目
+        name = _match_project(content)
+
+        # 确保笔记本列表已加载
+        if not _notebook_mapper._notebooks:
+            try:
+                notebooks = await _siyuan_client.list_notebooks()
+                _notebook_mapper.set_notebooks(notebooks)
+            except Exception:
+                pass
+
+        # 解析笔记本
+        try:
+            notebook_id = _notebook_mapper.resolve(notebook_spec)
+            notebook_name = ""
+            for nb in _notebook_mapper._notebooks:
+                if nb.id == notebook_id:
+                    notebook_name = nb.name
+                    break
+        except ValueError as e:
+            # 笔记本列表为空时尝试刷新
+            if not notebook_spec:
+                notebooks = await _siyuan_client.list_notebooks()
+                _notebook_mapper.set_notebooks(notebooks)
+                notebook_id = _notebook_mapper.resolve(notebook_spec)
+                notebook_name = _notebook_mapper._notebooks[0].name if _notebook_mapper._notebooks else ""
+            else:
+                return [types.TextContent(type="text", text=f"❌ {e}")]
+
+        # 生成标签
+        tags = generate_tags(content)
+
+        # 判断是否为整个对话（行数 > 30 或 字符数 > 2000）
+        total_lines = content.count("\n")
+        is_full_conversation = total_lines > 30 or len(content) > 2000
+
+        if not confirmed:
+            # 预览模式：返回确认信息，不写入
+            lines = []
+            if is_full_conversation:
+                lines.append("⚠️ **即将保存整个对话内容**")
+                lines.append(f"（共约 {total_lines + 1} 行，{len(content)} 字符）")
+            else:
+                lines.append("即将保存笔记：")
+            lines.append("")
+            lines.append(f"  📓 笔记本：{notebook_name or '默认'}")
+            lines.append(f"  📝 标题：{title}")
+            if name:
+                lines.append(f"  📎 项目：{name}")
+            if tags:
+                lines.append(f"  🏷️  标签：{'、'.join(tags)}")
+            lines.append("  ─────────────────")
+            plain_text = content.replace("```", "").replace("#", "").strip()[:200]
+            lines.append(f"  {plain_text}...")
+            lines.append("  ─────────────────")
+            lines.append("")
+            lines.append('确认保存？回复「确认保存」或「sy-save 已确认」来实际写入。')
+            return [types.TextContent(type="text", text="\n".join(lines))]
+
+        # 确认模式：实际写入
+        path = _make_doc_path(content, name=name)
         result = await _siyuan_client.create_doc(
             markdown=content,
             path=path,
-            notebook_id=notebook,
+            notebook_id=notebook_id,
         )
-        link = f"\n- 链接：siyuan://blocks/{result.id}" if result.id else ""
-        return [
-            types.TextContent(
-                type="text",
-                text=(
-                    f"✅ 已自动保存（来源：{source}）\n"
-                    f"- 项目：{name}\n"
-                    f"- 标题：{title}"
-                    f"{link}"
-                ),
-            )
+
+        result_lines = [
+            f"✅ 已保存",
+            "",
+            f"  📓 笔记本：{notebook_name or '默认'}",
+            f"  📂 路径：{notebook_name}/{f'项目/{name}/' if name else ''}{title}",
+            f"  📝 标题：{title}",
         ]
+        if tags:
+            result_lines.append(f"  🏷️  标签：{'、'.join(tags)}")
+        if result.id:
+            result_lines.append(f"  🔗 siyuan://blocks/{result.id}")
+
+        return [types.TextContent(type="text", text="\n".join(result_lines))]
+
     except ConnectionError as e:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except ValueError as e:
-        if str(e) == "no_notebook":
-            return await _handle_sy_notebooks({})
-        return [types.TextContent(type="text", text=f"❌ 自动保存失败：{e}")]
+        return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
     except Exception as e:
-        return [types.TextContent(type="text", text=f"❌ 自动保存失败：{e}")]
+        return [types.TextContent(type="text", text=f"❌ 保存失败：{e}")]
 
 
 # ── sy-find ──────────────────────────────────────
@@ -403,24 +358,54 @@ async def _handle_sy_find(args: dict) -> list[types.TextContent]:
     if not query.strip():
         return [types.TextContent(type="text", text="❌ 搜索关键词不能为空")]
 
+    # mode:code → 代码搜索
+    if mode == "code":
+        path_filter = args.get("path")
+        file_type = args.get("file_type", "code")
+        context_lines = args.get("context_lines", 3)
+
+        try:
+            results, skipped = _code_searcher.search(
+                query=query,
+                path_filter=path_filter,
+                file_type=file_type,
+                context_lines=context_lines,
+            )
+
+            if not results:
+                msg = f"📭 代码库中未找到「{query}」"
+                if skipped:
+                    msg += f"\n⚠️ 以下项目已跳过：{'；'.join(skipped)}"
+                return [types.TextContent(type="text", text=msg)]
+
+            lines = [f"🔍 找到 {len(results)} 处代码匹配「{query}」（mode: code）：\n"]
+            for i, r in enumerate(results, 1):
+                lines.append(f"{i}. **{r.repo}** — `{r.file}:{r.line}`")
+                lines.append(f"```\n{r.snippet}\n```")
+                lines.append("")
+
+            if skipped:
+                lines.append(f"⚠️ 以下项目已跳过：{'；'.join(skipped)}")
+
+            return [types.TextContent(type="text", text="\n".join(lines))]
+        except Exception as e:
+            return [types.TextContent(type="text", text=f"❌ 代码搜索失败：{e}")]
+
+    # mode:normal/ai → 思源搜索
     try:
         results = await _siyuan_client.search_notes(
             query=query, mode=mode, limit=limit, notebook=notebook
         )
 
         if not results:
-            return [
-                types.TextContent(
-                    type="text", text=f"📭 未找到与「{query}」相关的结果"
-                )
-            ]
+            return [types.TextContent(type="text", text=f"📭 未找到与「{query}」相关的结果")]
 
-        lines = [f"🔍 找到 {len(results)} 条结果（模式：{mode}）：\n"]
-        for r in results:
-            lines.append(f"**{r.title}**")
-            lines.append(f"> {r.snippet}")
+        lines = [f"🔍 找到 {len(results)} 条结果（mode: {mode}）：\n"]
+        for i, r in enumerate(results, 1):
+            lines.append(f"{i}. 📄 **{r.title}**")
+            lines.append(f"   > {r.snippet}")
             if r.path:
-                lines.append(f"  📁 {r.path}")
+                lines.append(f"   📁 {r.path}")
             lines.append("")
 
         return [types.TextContent(type="text", text="\n".join(lines))]
@@ -428,45 +413,6 @@ async def _handle_sy_find(args: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=f"❌ {e}")]
     except Exception as e:
         return [types.TextContent(type="text", text=f"❌ 搜索失败：{e}")]
-
-
-# ── code-find ───────────────────────────────────
-
-async def _handle_code_find(args: dict) -> list[types.TextContent]:
-    query = args.get("query", "")
-    path_filter = args.get("path")
-    file_type = args.get("file_type", "code")
-    context_lines = args.get("context_lines", 3)
-
-    if not query.strip():
-        return [types.TextContent(type="text", text="❌ 搜索关键词不能为空")]
-
-    try:
-        results, skipped = _code_searcher.search(
-            query=query,
-            path_filter=path_filter,
-            file_type=file_type,
-            context_lines=context_lines,
-        )
-
-        if not results:
-            msg = f"📭 代码库中未找到「{query}」"
-            if skipped:
-                msg += f"\n⚠️ 以下项目已跳过：{'；'.join(skipped)}"
-            return [types.TextContent(type="text", text=msg)]
-
-        lines = [f"🔍 找到 {len(results)} 处代码匹配「{query}」：\n"]
-        for r in results:
-            lines.append(f"**{r.repo}** — `{r.file}:{r.line}`")
-            lines.append(f"```\n{r.snippet}\n```")
-            lines.append("")
-
-        if skipped:
-            lines.append(f"⚠️ 以下项目已跳过：{'；'.join(skipped)}")
-
-        return [types.TextContent(type="text", text="\n".join(lines))]
-    except Exception as e:
-        return [types.TextContent(type="text", text=f"❌ 代码搜索失败：{e}")]
 
 
 # ── 入口 ─────────────────────────────────────────
