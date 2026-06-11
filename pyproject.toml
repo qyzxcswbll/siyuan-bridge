@@ -10,7 +10,6 @@ license = "MIT"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -36,9 +35,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your/siyuan-mcp"
-Repository = "https://github.com/your/siyuan-mcp"
-Issues = "https://github.com/your/siyuan-mcp/issues"
+Homepage = "https://github.com/qyzxcswbll/siyuan-bridge"
+Repository = "https://github.com/qyzxcswbll/siyuan-bridge"
+Issues = "https://github.com/qyzxcswbll/siyuan-bridge/issues"
+
+[project.scripts]
+siyuan-mcp = "siyuan_mcp.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
