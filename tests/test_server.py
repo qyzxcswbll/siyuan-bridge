@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock
 
 from siyuan_mcp.server import (
     _handle_sy_notebook,
-    _handle_sy_list,
     _handle_sy_save,
     _handle_sy_read,
     _handle_sy_delete,
@@ -69,54 +68,6 @@ async def test_sy_notebook_connection_error():
         assert "思源笔记未运行" in result[0].text
     finally:
         srv._siyuan_client = None
-
-
-# ── sy-list 测试 ───────────────────────────────
-
-@pytest.mark.asyncio
-async def test_sy_list_docs():
-    import siyuan_mcp.server as srv
-    from siyuan_mcp.config.loader import Config
-    from siyuan_mcp.siyuan.models import NotebookInfo
-
-    srv._config = Config()
-    srv._siyuan_client = AsyncMock()
-    srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="测试笔记本", closed=False),
-    ]
-    srv._siyuan_client.list_docs.return_value = [
-        {"id": "doc-1", "title": "文档1", "path": "/文档1"},
-        {"id": "doc-2", "title": "文档2", "path": "/文件夹/文档2"},
-    ]
-
-    try:
-        result = await _handle_sy_list({"notebook": "1"})
-        assert "文档1" in result[0].text
-        assert "文档2" in result[0].text
-    finally:
-        srv._siyuan_client = None
-        srv._config = None
-
-
-@pytest.mark.asyncio
-async def test_sy_list_empty():
-    import siyuan_mcp.server as srv
-    from siyuan_mcp.config.loader import Config
-    from siyuan_mcp.siyuan.models import NotebookInfo
-
-    srv._config = Config()
-    srv._siyuan_client = AsyncMock()
-    srv._notebook_mapper._notebooks = [
-        NotebookInfo(id="nb-1", name="空笔记本", closed=False),
-    ]
-    srv._siyuan_client.list_docs.return_value = []
-
-    try:
-        result = await _handle_sy_list({"notebook": "1"})
-        assert "没有文档" in result[0].text
-    finally:
-        srv._siyuan_client = None
-        srv._config = None
 
 
 # ── sy-save 测试 ───────────────────────────────

@@ -264,22 +264,3 @@ async def test_remove_doc_success(config):
         mock_post.return_value.json = lambda: mock_response
         result = await client.remove_doc("nb-1", "/test/doc")
         assert result is True
-
-
-@pytest.mark.asyncio
-async def test_list_docs_success(config):
-    client = SiyuanClient(config)
-    mock_response = {
-        "code": 0, "msg": "",
-        "data": [
-            {"id": "doc-1", "title": "文档1", "path": "/文档1"},
-            {"id": "doc-2", "title": "文档2", "path": "/文件夹/文档2"},
-        ],
-    }
-    with patch.object(client._client, "post") as mock_post:
-        mock_post.return_value = AsyncMock()
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json = lambda: mock_response
-        result = await client.list_docs("nb-1")
-        assert len(result) == 2
-        assert result[0]["id"] == "doc-1"

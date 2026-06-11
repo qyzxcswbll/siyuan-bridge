@@ -111,13 +111,6 @@ class SiyuanClient:
         })
         return True
 
-    async def list_docs(self, notebook_id: str) -> list[dict]:
-        """列出笔记本下的文档树。"""
-        resp = await self._call_api("/api/filetree/getDocTree", {
-            "notebook": notebook_id,
-        })
-        return resp if isinstance(resp, list) else []
-
     async def _call_api(self, path: str, data: dict[str, Any]) -> Any:
         """调用思源 API 并处理错误。"""
         try:
