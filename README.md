@@ -29,6 +29,12 @@
 ### 安装
 
 ```bash
+pip install siyuan-mcp
+```
+
+或从源码安装：
+
+```bash
 git clone https://github.com/your/siyuan-mcp.git
 cd siyuan-mcp
 pip install -e .
