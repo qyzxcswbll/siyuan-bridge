@@ -1,6 +1,6 @@
 [project]
 name = "siyuan-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP service connecting Claude with Siyuan Note"
 readme = "README.md"
 authors = [
@@ -41,6 +41,7 @@ Issues = "https://github.com/qyzxcswbll/siyuan-bridge/issues"
 
 [project.scripts]
 siyuan-mcp = "siyuan_mcp.server:main"
+siyuan-mcp-install = "siyuan_mcp.__main__:_install_cli"
 
 [build-system]
 requires = ["setuptools>=68"]
