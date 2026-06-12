@@ -1,9 +1,6 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
+# TypeScript
+node_modules/
 dist/
-build/
 
 # IDE
 .idea/
@@ -14,14 +11,11 @@ build/
 .DS_Store
 Thumbs.db
 
-# Build
-dist/
-*.egg-info/
-build/
-
 # Project
 config.yaml
 rg.zip
 .claude/sy-content.md
-*.egg-info
-dist/
+
+# Skills
+skills-lock.json
+.npmrc

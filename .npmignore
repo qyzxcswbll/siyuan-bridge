@@ -1,4 +1,6 @@
-*
-!bin/
-!package.json
-!.npmignore
+src/
+src/__tests__/
+tsconfig*.json
+node_modules/
+.vscode/
+.git/

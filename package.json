@@ -1,12 +1,40 @@
 {
-  "name": "siyuan-mcp",
-  "version": "0.1.0",
-  "description": "MCP server connecting Claude with Siyuan Note — Python wrapper for npx compatibility",
+  "name": "siyuan-mcp-bridge",
+  "version": "0.2.0",
+  "description": "MCP server bridging Claude/any AI with SiYuan Note",
+  "type": "module",
   "bin": {
-    "siyuan-mcp": "bin/siyuan-mcp.js"
+    "siyuan-mcp-bridge": "./bin/siyuan-mcp.js"
   },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "postinstall": "pip install siyuan-mcp -q"
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "start": "node bin/siyuan-mcp.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@clack/prompts": "^0.10.0",
+    "chalk": "^5.4.0",
+    "commander": "^13.0.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "repository": "github:qyzxcswbll/siyuan-bridge",
   "license": "MIT"

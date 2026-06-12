@@ -1,4 +1,5 @@
 #!/usr/bin/env node
-const { spawn } = require('child_process');
-const child = spawn('python', ['-m', 'siyuan_mcp'], { stdio: 'inherit' });
-child.on('exit', code => process.exit(code ?? 0));
+import('../dist/cli.js').catch(err => {
+  console.error('Failed to load siyuan-mcp-bridge:', err.message);
+  process.exit(1);
+});

@@ -2,7 +2,7 @@
 
 连接 **Claude** 与 **[思源笔记](https://github.com/siyuan-note/siyuan)** 的 MCP 服务。
 
-**v0.1.1 · [PyPI](https://pypi.org/project/siyuan-mcp/)**
+**v0.1.1 · [PyPI](https://pypi.org/project/siyuan-mcp/) · [npm](https://www.npmjs.com/package/siyuan-mcp-bridge)**
 
 ## 工具
 
@@ -19,6 +19,8 @@
 
 ```bash
 pip install siyuan-mcp
+# 或通过 npx（自动安装 Python 依赖）
+npx siyuan-mcp-bridge
 ```
 
 ### 注册到 Claude（一步）
